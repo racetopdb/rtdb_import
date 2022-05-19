@@ -1,4 +1,6 @@
-<img src="https://rtdb-doc.oss-cn-beijing.aliyuncs.com/quick_learn/log_rtdb.png?versionId=CAEQHhiBgIDUvLPvhhgiIGFjMWIyNTU2N2RhNTRiODk5N2FmMjNlZDNiZmYzYTMz" height="100"  />
+<a href="https://www.rtdb.com" target = "_blank">
+    <img border="0" src="https://rtdb-doc.oss-cn-beijing.aliyuncs.com/quick_learn/log_rtdb.png?versionId=CAEQHhiBgIDUvLPvhhgiIGFjMWIyNTU2N2RhNTRiODk5N2FmMjNlZDNiZmYzYTMz" height="100"/>
+</a>
 
 RTDB是一款高性能、高可用、跨平台、分布式、自主可控、支持SQL，具备高效的数据调度能力和分析能力的时序数据库。为满足时序场景第一需求：大数据高并发实时入库与毫秒级查询响应。不走技术路线依赖，不依赖任何开源库，重新定义底层存储架构与算法，深耕实现每行代码。
 
