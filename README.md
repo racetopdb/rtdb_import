@@ -8,6 +8,7 @@ Timescale: https://github.com/timescale/timescaledb
 
 # Features
 - **支持的数据类型**
+
 下表所示RTDB支持的数据类型。其中，“**数据类型及别名**”列中所示的内容都可以在SQL语句中使用。我们在SQL99标准以外，支持更多的数据类型别名，是为了与更广泛的与其它数据库兼容。
    
    支持的数据类型如下表：
@@ -34,6 +35,7 @@ Timescale: https://github.com/timescale/timescaledb
   [注2] 在测试版本中，varchar 采用定长字符串 char(?) 技术。
   
 - **支持表结构模板预先申明，根据表结构导入数据**
+
 该项目是根据表结构的模板创建表，模板中定义了表的字段名称、字段类型以及字段是否支持空。系统保留字段名称“time”作为主键，如果表结构中没有申明“time”字段，系统根据记录记录导入时间自动生成时间戳作为主键。
 表结构模板格式如下：
 
@@ -55,12 +57,15 @@ gps_latitude float
 gps_vehicle_speed float
 ```
 - **支持文本数据与csv数据的导入**
+
 不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：空格“ ”、逗号“，”、顿号“、”。
 
 - **支持模拟数据的导入**
+
 如果在配置中没有指定需要导入的数据文件，系统会智能匹配表结构模板中的数据类型，随机生成数据，执行数据导入。
 
 ## Requirements
+
 主程序，在 Windows 下的可执行文件名是：rtdb_import.exe，在 Linux 下的可执行文件名是：rtdb_import
 
 在程序同目录下，包含数据库连接客户端的动态连接库文件。
@@ -87,15 +92,18 @@ TAOS 数据库客户端接口只能通过 -ltaos 编译选项连接，所以要�
 由于timescale是基于postgres的，所以如果要编译适配timescale，需要引入postgres的依赖。
 
 **编译器配置**
+
 windows，vs2010
 linux，gcc
 
 
 ## Build
 - **windows**
+
 执行wide_table.sln编译
 
 - **linux**
+
 cd \wide_table\rtdb
 执行 make
 
