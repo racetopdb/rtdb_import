@@ -1,0 +1,262 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="create_table.cpp" />
+    <ClCompile Include="create_table_general.cpp" />
+    <ClCompile Include="create_table_v2.cpp" />
+    <ClCompile Include="file_operation.cpp" />
+    <ClCompile Include="find.cpp" />
+    <ClCompile Include="find_general.cpp" />
+    <ClCompile Include="find_v2.cpp" />
+    <ClCompile Include="generate.cpp" />
+    <ClCompile Include="generate_general.cpp" />
+    <ClCompile Include="insert.cpp" />
+    <ClCompile Include="insert_general.cpp" />
+    <ClCompile Include="insert_v2.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="RTDB\wide_rtdb.cpp" />
+    <ClCompile Include="RTDB\wide_rtdb_conn.cpp" />
+    <ClCompile Include="source\dir\dir_source.cpp" />
+    <ClCompile Include="source\dir\dir_worker.cpp" />
+    <ClCompile Include="source\none\none_source.cpp" />
+    <ClCompile Include="source\none\none_worker.cpp" />
+    <ClCompile Include="source\source.cpp" />
+    <ClCompile Include="TAOS\wide_taos.cpp" />
+    <ClCompile Include="TAOS\wide_taos_conn.cpp" />
+    <ClCompile Include="TIMESCALEDB\wide_timescaledb.cpp" />
+    <ClCompile Include="TIMESCALEDB\wide_timescaledb_conn.cpp" />
+    <ClCompile Include="utils.cpp" />
+    <ClCompile Include="wide_base.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="file_operation.h" />
+    <ClInclude Include="insert_general.h" />
+    <ClInclude Include="main.h" />
+    <ClInclude Include="RTDB\include\dpr_stdinc.h" />
+    <ClInclude Include="RTDB\include\tsdb_tools.h" />
+    <ClInclude Include="RTDB\include\tsdb_v3.h" />
+    <ClInclude Include="RTDB\wide_rtdb.h" />
+    <ClInclude Include="RTDB\wide_rtdb_conn.h" />
+    <ClInclude Include="source\dir\dir_source.h" />
+    <ClInclude Include="source\dir\dir_worker.h" />
+    <ClInclude Include="source\none\none_source.h" />
+    <ClInclude Include="source\none\none_worker.h" />
+    <ClInclude Include="source\source.h" />
+    <ClInclude Include="TAOS\include\stdbool.h" />
+    <ClInclude Include="TAOS\include\taos.h" />
+    <ClInclude Include="TAOS\include\taoserror.h" />
+    <ClInclude Include="TAOS\wide_taos.h" />
+    <ClInclude Include="TAOS\wide_taos_conn.h" />
+    <ClInclude Include="TIMESCALEDB\include\catalog\genbki.h" />
+    <ClInclude Include="TIMESCALEDB\include\catalog\pg_type.h" />
+    <ClInclude Include="TIMESCALEDB\include\libpq-fe.h" />
+    <ClInclude Include="TIMESCALEDB\include\pg_config_ext.h" />
+    <ClInclude Include="TIMESCALEDB\include\postgres_ext.h" />
+    <ClInclude Include="TIMESCALEDB\wide_timescaledb.h" />
+    <ClInclude Include="TIMESCALEDB\wide_timescaledb_conn.h" />
+    <ClInclude Include="utils.h" />
+    <ClInclude Include="wide_base.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\readme.txt" />
+    <None Include="makefile" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{12DE2568-1128-48EF-B6D8-A985186E7D71}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>test_client</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)$(IntDir)</OutDir>
+    <IntDir>$(Platform)_$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)$(IntDir)</OutDir>
+    <TargetName>$(ProjectName)</TargetName>
+    <IntDir>$(Platform)_$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)$(IntDir)</OutDir>
+    <IntDir>$(Platform)_$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)$(IntDir)</OutDir>
+    <IntDir>$(Platform)_$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>RTDB\include;TAOS\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy /y $(ProjectDir)RTDB\win32\tsdbd.dll  $(OutDir)\tsdb.dll
+copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>RTDB\include;TAOS\include;TIMESCALEDB\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy /y $(ProjectDir)RTDB\x64\tsdbd.dll  $(OutDir)\tsdb.dll
+copy /y $(ProjectDir)TAOS\x64\taos.dll  $(OutDir)\
+copy /y $(ProjectDir)TIMESCALEDB\x64\libpq.dll   $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libcrypto-1_1-x64.dll  $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libiconv-2.dll  $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libintl-9.dll   $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libssl-1_1-x64.dll $(OutDir)\
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>RTDB\include;TAOS\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy /y $(ProjectDir)RTDB\win32\tsdb.dll  $(OutDir)\
+copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>RTDB\include;TAOS\include;TIMESCALEDB\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy /y $(ProjectDir)RTDB\x64\tsdb.dll  $(OutDir)\
+copy /y $(ProjectDir)TAOS\x64\taos.dll  $(OutDir)\
+copy /y $(ProjectDir)TIMESCALEDB\x64\libpq.dll   $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libcrypto-1_1-x64.dll  $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libiconv-2.dll  $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libintl-9.dll   $(OutDir)\
+
+copy /y $(ProjectDir)TIMESCALEDB\x64\libssl-1_1-x64.dll $(OutDir)\
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,2388 @@
+#include "wide_base.h"
+#include "utils.h"
+#include "file_operation.h"
+#include <assert.h>
+#include <string>
+#include <map>
+
+
+
+#define INSERT_USE_TIMESTAMP    1
+#define ENABLE_WRITE_INSERT_SQL 0
+// 默认CSV文件分割符号  
+#define DEFAULT_CSV_FILE_SEP "\t"
+
+namespace rtdb
+{
+namespace test
+{
+namespace wide
+{
+
+// wide table, each table just only has one field.
+
+struct thread_param_insert_table_general_t
+{
+    thread_param_insert_table_general_t()
+        : lines()
+    {}
+
+    // Database Engine type
+    db_type_t                   engine;
+
+    wide_conn_t *             conn;
+
+    // Thread index [0, thread_count)
+    uint32_t                    thread_id;
+    // Thread Count. by default, this value same with CPU core count.
+    uint32_t                    thread_count;
+
+    // single SQL max bytes
+    uint32_t                    sql_bytes;
+
+    // first time by ms
+    // in writing progress, the value updated to the time when the data is currently written.
+    volatile uint64_t           start_time;
+    // stop time
+    uint64_t                    stop_time;
+    // stop on local time
+    uint64_t                    stop_local_time;
+    // stop line in current thread
+    uint64_t                    stop_line;
+    // step time by ms
+    uint32_t                    step_time;
+
+    // realtime insert table count in this thread.
+    volatile uint64_t           insert_line_count;
+    // We need insert table count in this thread.
+    uint32_t                    insert_need;
+    // Insert table from index
+    uint32_t                    insert_from;
+    // error code, 0 indicate OK, error otherwise.
+    int                         r;
+
+    // point to line data array.
+    std::vector< tsdb_str > *   lines;
+    // database name
+    const char *                db;
+
+    // thread object
+    pthread_t                   thread;
+    // Is current thread already exited? 
+    // current thread need set this value to true before quit the thread.
+    volatile bool               exited;
+
+    // 表配置信息  
+    std::map<std::string, struct test_table_file_info_t>* map_test_table_file_info_t;
+
+    // 表名前缀和表数据映射关系  
+    std::map < std::string, std::vector<std::string> > *map_vt_table_head_data_path;
+
+    // 表名前缀和表数据对应关系 vector 形式  
+    //std::vector<struct table_lead_and_table_path_t> *vt_table_lead_and_table_path_t;
+
+    // 表名前缀和表名对应关系 vector 形式 
+    std::vector<struct table_lead_and_table_name_t> *vt_table_lead_and_table_name_t;
+
+
+    // 各个表插入数据运行时状态  
+    std::vector<struct insert_table_runtime_info_t> *vt_insert_table_runtime_info_t;
+
+    // padding memory, nothing.
+    char                        padding[ 64 ];
+};
+
+static inline size_t calc_start_hash( size_t table_index )
+{
+    return table_index * 13;
+}
+
+static bool next_bool( thread_param_insert_table_general_t * param, size_t table_i, uint64_t insert_line_index )
+{
+    uint64_t x = (uint64_t)calc_start_hash( table_i ) + insert_line_index;
+    return 0 == ( x % 2 );
+}
+
+static int next_int( thread_param_insert_table_general_t * param, size_t table_i, uint64_t insert_line_index )
+{
+    uint64_t x = (uint64_t)calc_start_hash( table_i ) + insert_line_index;
+
+    double radian = x / ( (double)60 * 2 ) * 3.1415926;
+    double y      = sin( radian ) * 2 * 60;
+    return (int)y;
+}
+
+static float next_float( thread_param_insert_table_general_t * param, size_t table_i, uint64_t insert_line_index )
+{
+    uint64_t x = (uint64_t)calc_start_hash( table_i ) + insert_line_index;
+
+    double radian = x / ( (double)60 * 2 ) * 3.1415926;
+    double y      = sin( radian ) * 2 * 60;
+    return (float)y;
+}
+
+
+#if 0
+
+/**
+ * @brief  执行将一组数据插入到各个表中  
+ * @param[in]  void * _param                                本线程线程参数  
+ * @param[in]  std::string &path                            当前正在执行的文件如果是产生数据的话 此文件为空  
+ * @param[in]  std::vector<size_t>& current_vt_table_index  执行这一组sql语句 每天语句中可能都需要执行             
+ * @param[in]  uint32_t  max_sql_bytes                      最长的sql size 达到一定长度才真正执行 否则啥也不做  
+ * @param[in]  bool is_force_exec_insert                    强制执行 忽略max_sql_bytes大小限制     
+ * @param[in]  bool is_set_end_of_file_or_time_end          设置结束标志 如果为true 则再次刷新数据    
+ * @return  0 成功 其他 失败  
+ */
+int exec_insert_into_table_wrapper( 
+    void * _param,
+    std::string &path, 
+    std::vector<size_t>& current_vt_table_index,
+    uint32_t  max_sql_bytes,
+    bool is_force_exec_insert,
+    bool is_set_end_of_file_or_time_end
+    ) 
+{
+    int r = 0;
+
+    thread_param_insert_table_general_t* param = (thread_param_insert_table_general_t*)_param;
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+
+    size_t table_index =  table_index = current_vt_table_index[0];
+    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+    file_operation& fo = itri.fo;
+    int& line_no = itri.line_no;
+    
+    struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+    //根据表名前缀找到表结构  
+    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+        param->map_test_table_file_info_t->find(tlatn.table_lead);
+    // 没有找到 见鬼了  
+    if (iter == param->map_test_table_file_info_t->end()) {
+        // 打印错误 并退出   
+        r = ENOENT;
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s] not found",
+            param->thread_id, r, path.c_str(), line_no, tlatn.table_lead.c_str());
+        return r;
+    }
+    struct test_table_file_info_t& ttfi = iter->second;
+    // 字段列表数组 注意 index = 0 为 主键(time) 下面找对应的字段时需要注意   
+    //std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+    std::string sql;
+    sql.resize(max_sql_bytes + 4096); //提前准备好 sql 内存 加速运行  
+
+   
+    
+
+    for (size_t i = 0; i < current_vt_table_index.size(); i++)
+    {
+        size_t table_index = current_vt_table_index[i];
+        struct insert_table_runtime_info_t& itri_item = (*param->vt_insert_table_runtime_info_t)[table_index];
+        struct table_lead_and_table_name_t& tlatn_item = (*param->vt_table_lead_and_table_name_t)[table_index];
+        // 每次 仅仅获取 带头大哥的sql就可以了  
+        struct insert_table_runtime_info_t& itri_item_head = (*param->vt_insert_table_runtime_info_t)[0];
+        
+        // 如果已经读到默认了 则直接忽略  
+        if (itri_item.is_set_end_of_file_or_time_end) {
+            continue;
+        }
+
+        // 如果是未使用文件情况  即数据是自动产生的 那所有的表数据是一模一样的 除了表名  
+        if (!itri_item.is_use_file) {
+
+            // 这是无条件执行的 不管当前sql size大小    
+            if (is_set_end_of_file_or_time_end || is_force_exec_insert) {
+                sql.resize(0);
+                
+                sql = "INSERT INTO ";
+                sql += tlatn_item.table_name;
+                sql += " ";
+                sql += itri_item_head.fields;
+                sql += " ";
+                sql += " VALUES ";
+                sql += itri_item_head.datas;
+
+
+                // execute the SQL return value stored to param->r.
+                r = param->conn->query_non_result(sql.c_str(), sql.size());
+                if (unlikely(0 != r)) {
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                        param->thread_id, r, tlatn_item.table_name.c_str(), line_no);
+                    p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                    return r;
+                }
+                param->insert_line_count += itri_item_head.line_count;
+                itri_item.is_clear_data = true;
+            }
+            else { // 否则需要关注下sql size  
+                if (itri_item_head.datas.size() > (size_t)max_sql_bytes)
+                {
+                    sql.resize(0);
+
+                    sql = "INSERT INTO ";
+                    sql += tlatn_item.table_name;
+                    sql += " ";
+                    sql += itri_item_head.fields;
+                    sql += " ";
+                    sql += " VALUES ";
+                    sql += itri_item_head.datas;
+
+
+                    // execute the SQL return value stored to param->r.
+                    r = param->conn->query_non_result(sql.c_str(), sql.size());
+                    if (unlikely(0 != r)) {
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                            param->thread_id, r, tlatn_item.table_name.c_str(), line_no);
+                        p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                        return r;
+                    }
+                    param->insert_line_count += itri_item_head.line_count;
+                    itri_item.is_clear_data = true;
+                }
+                else {
+                    itri_item.is_clear_data = false;
+                }
+            }
+        }
+        else { // 如果是文件  
+            
+            // 表名后缀关联的字段名字 如果为空的话 每个表的数据都是一模一样的 除了表名  
+            if (ttfi.table_tail_field_name.empty()) {
+                // 这是无条件执行的 不管当前sql size大小    
+                if (is_set_end_of_file_or_time_end || is_force_exec_insert) {
+                    sql.resize(0);
+
+                    sql = "INSERT INTO ";
+                    sql += tlatn_item.table_name;
+                    sql += " ";
+                    sql += itri_item_head.fields;
+                    sql += " ";
+                    sql += " VALUES ";
+                    sql += itri_item_head.datas;
+
+
+                    // execute the SQL return value stored to param->r.
+                    r = param->conn->query_non_result(sql.c_str(), sql.size());
+                    if (unlikely(0 != r)) {
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                            param->thread_id, r, tlatn_item.table_name.c_str(), line_no);
+                        p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                        return r;
+                    }
+                    param->insert_line_count += itri_item_head.line_count;
+                    itri_item.is_clear_data = true;
+                }
+                else { // 否则需要关注下sql size  
+                    if (itri_item_head.datas.size() > (size_t)max_sql_bytes)
+                    {
+                        sql.resize(0);
+
+                        sql = "INSERT INTO ";
+                        sql += tlatn_item.table_name;
+                        sql += " ";
+                        sql += itri_item_head.fields;
+                        sql += " ";
+                        sql += " VALUES ";
+                        sql += itri_item_head.datas;
+
+
+                        // execute the SQL return value stored to param->r.
+                        r = param->conn->query_non_result(sql.c_str(), sql.size());
+                        if (unlikely(0 != r)) {
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                                param->thread_id, r, tlatn_item.table_name.c_str(), line_no);
+                            p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                            return r;
+                        }
+                        param->insert_line_count += itri_item_head.line_count;
+                        itri_item.is_clear_data = true;
+                    }
+                    else {
+                        itri_item.is_clear_data = false;
+                    }
+                }
+            }
+            else { //每个表名均是不同的  
+                 // 这是无条件执行的 不管当前sql size大小    
+                if (is_set_end_of_file_or_time_end || is_force_exec_insert) {
+                    sql.resize(0);
+
+                    sql = "INSERT INTO ";
+                    sql += tlatn_item.table_name;
+                    sql += " ";
+                    sql += itri_item_head.fields;
+                    sql += " ";
+                    sql += " VALUES ";
+                    sql += itri_item.datas;
+
+
+                    // execute the SQL return value stored to param->r.
+                    r = param->conn->query_non_result(sql.c_str(), sql.size());
+                    if (unlikely(0 != r)) {
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                            param->thread_id, r, tlatn_item.table_name.c_str(), line_no);
+                        p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                        return r;
+                    }
+                    param->insert_line_count += itri_item_head.line_count;
+                    itri_item.is_clear_data = true;
+                }
+                else { // 否则需要关注下sql size  
+                    if (itri_item_head.datas.size() > (size_t)max_sql_bytes)
+                    {
+                        sql.resize(0);
+
+                        sql = "INSERT INTO ";
+                        sql += tlatn_item.table_name;
+                        sql += " ";
+                        sql += itri_item_head.fields;
+                        sql += " ";
+                        sql += " VALUES ";
+                        sql += itri_item.datas;
+
+
+                        // execute the SQL return value stored to param->r.
+                        r = param->conn->query_non_result(sql.c_str(), sql.size());
+                        if (unlikely(0 != r)) {
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                                param->thread_id, r, tlatn_item.table_name.c_str(), line_no);
+                            p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                            return r;
+                        }
+                        param->insert_line_count += itri_item.line_count;
+                        itri_item.is_clear_data = true;
+                    }
+                    else {
+                        itri_item.is_clear_data = false;
+                    }
+                }
+            }
+        }
+    }
+
+    // 如果已经执行过了则需要  
+
+
+    return r;
+}
+#endif
+
+// 查找到主键的索引号 找不到也没有关系   
+int find_primary_key_index(
+    void * _param, 
+    size_t table_index, 
+    std::string &path, 
+    std::vector<std::string> &vt_table_fields_name, 
+    std::string &primary_key_field_name, size_t &primary_key_index)
+{
+    int r = 0;
+    thread_param_insert_table_general_t* param = (thread_param_insert_table_general_t*)_param;
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+    int& line_no = itri.line_no;
+    struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+    primary_key_index = size_t(-1);
+
+
+    // 主键不为空 time 值和 指定主键值相同 否则使用内部自动增长的时间   
+    if (!primary_key_field_name.empty()) {
+        for (size_t x = 0; x < vt_table_fields_name.size(); x++)
+        {
+            if (primary_key_field_name == vt_table_fields_name[x]) {
+                primary_key_index = x;
+                break;
+            }
+        }
+
+        // 判断是否找到主键字段了  
+        if (primary_key_index == size_t(-1)) {
+            r = ENOENT;
+            // 打印错误 并退出   
+            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][primary_key_field_name:%s] not found",
+                param->thread_id, r, path.c_str(), line_no,
+                tlatn.table_lead.c_str(), primary_key_field_name.c_str());
+           
+            return r;
+        }
+    }
+
+    return r;
+}
+
+
+
+//查找表名后缀 从获取的数据中  
+// r= 0;table_name="" 是正常的 说明未按指定字段对数据进行分类 也就是说不需要分发到指定的表中了  
+// r =0; table_name 不为空 需要发动到指定的表中  
+static int find_table_tail(
+    void * _param, 
+    size_t table_index, 
+    std::string &path, 
+    std::vector<tsdb_str>  &vt_data, 
+    std::string &table_name)
+{
+    int r = 0;
+
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    table_name.resize(0);
+
+    thread_param_insert_table_general_t* param = (thread_param_insert_table_general_t*)_param;
+    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+    int& line_no = itri.line_no;
+
+    struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+    //根据表名前缀找到表结构  
+    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+        param->map_test_table_file_info_t->find(tlatn.table_lead);
+    // 没有找到 见鬼了  
+    if (iter == param->map_test_table_file_info_t->end()) {
+        // 打印错误 并退出   
+        r = ENOENT;
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s] not found",
+            param->thread_id, r, path.c_str(), line_no, tlatn.table_lead.c_str());
+        return r;
+    }
+
+    struct test_table_file_info_t& ttfi = iter->second;
+
+    std::vector<std::string>& vt_table_fields_name = itri.vt_table_fields_name;
+    // 指示表名后缀关联的字段名字  
+    std::string& table_tail_field_name = ttfi.table_tail_field_name;
+    
+
+    // 查找表名后缀  
+    if(!table_tail_field_name.empty())
+    {
+        size_t m = 0;
+        bool is_find = false;
+        for (; m < vt_table_fields_name.size(); ++m) {
+            if (vt_table_fields_name[m] == table_tail_field_name) {
+                is_find = true;
+                break;
+            }
+        }
+
+        // 没有找到 直接退出  
+        if (!is_find) {
+            r = ENOENT;
+            // 打印错误 并退出   
+            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][table_tail_field_name:%s] not found",
+                param->thread_id, r, path.c_str(), line_no,
+                tlatn.table_lead.c_str(), table_tail_field_name.c_str());
+            return r;
+        }
+        table_name = tlatn.table_lead;
+        table_name += std::string(vt_data[m].ptr, vt_data[m].len);
+    }
+
+    return r;
+}
+
+
+
+// 从文件中获取一行数据并将解析为一个字符串 为 values (使用这里)  
+// 类似 1,"123", 23.3434  
+// 注意 两边未加()  
+// 插入数据的时候  注意是values (line)  
+static int parse_data_to_insert_value_string_from_file(
+    void * _param,
+    size_t table_index,
+    std::string &path,
+    std::vector<tsdb_str>  &vt_data, 
+    std::string& primary_key_field_name, 
+    size_t primary_key_index,
+    std::string &insert_value_string) 
+{
+    int r = 0;
+    thread_param_insert_table_general_t* param = (thread_param_insert_table_general_t*)_param;
+
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    insert_value_string.resize(0);
+
+
+    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+    file_operation& fo = itri.fo;
+    int& line_no = itri.line_no;
+    std::vector<std::string>& vt_table_fields_name = itri.vt_table_fields_name;
+    volatile uint64_t& start_time = itri.start_time;
+
+    struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+    //根据表名前缀找到表结构  
+    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+        param->map_test_table_file_info_t->find(tlatn.table_lead);
+    // 没有找到 见鬼了  
+    if (iter == param->map_test_table_file_info_t->end()) {
+        // 打印错误 并退出   
+        r = ENOENT;
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s] not found",
+            param->thread_id, r, path.c_str(), line_no, tlatn.table_lead.c_str());
+        return r;
+    }
+
+    struct test_table_file_info_t& ttfi = iter->second;
+
+    // 字段列表数组 注意 index = 0 为 主键(time) 下面找对应的字段时需要注意   
+    std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+    
+
+    // 核心中的核心 构造插入的数据  
+    for (size_t y = 0; y < vt_data.size(); y++)
+    {
+        if (0 == y) {
+            if (!primary_key_field_name.empty()) {
+                // 主键确定是存在的  
+                insert_value_string += "\'";
+                insert_value_string +=
+                    std::string(vt_data[primary_key_index].ptr, vt_data[primary_key_index].len);
+                insert_value_string += "\'";
+                insert_value_string += ", ";
+            }
+            else { // 主键为空的话 使用time固定时间  
+                char start_time_s[64];
+                int  start_time_sl = (int)sizeof(start_time_s);
+                p->tools->datetime_to_str(start_time, start_time_s, &start_time_sl);
+                // 更新时间 方便下次继续使用  
+                start_time += param->step_time;
+                insert_value_string += "\'";
+                insert_value_string += start_time_s;
+                insert_value_string += "\'";
+                insert_value_string += ", ";
+            }
+        }
+        else {
+            insert_value_string += ", ";
+        }
+
+        // 此字段数据为空  
+        if (0 == vt_data[y].len || NULL == vt_data[y].ptr) {
+            // 检查合法性 是否此字段是否允许为空  
+            if (!vt_test_tb_field_info_t[y + 1].is_null) {
+                r = EFAULT;
+                // 打印错误 并退出   
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][field:%s] not allow null",
+                    param->thread_id, param->r, path.c_str(), line_no,
+                    tlatn.table_lead.c_str(), vt_test_tb_field_info_t[y + 1].name.c_str());
+                return r;
+            }
+            insert_value_string += "null";
+        }
+        else { // 有数据  
+            /// string
+            if (TSDB_DATATYPE_STRING == vt_test_tb_field_info_t[y + 1].datatype ||
+                TSDB_DATATYPE_DATETIME_MS == vt_test_tb_field_info_t[y + 1].datatype)
+            {
+                insert_value_string += "\'";
+
+                if (TSDB_DATATYPE_STRING == vt_test_tb_field_info_t[y + 1].datatype &&
+                    vt_data[y].len > vt_test_tb_field_info_t[y + 1].len) {
+
+                    insert_value_string += std::string(vt_data[y].ptr, vt_test_tb_field_info_t[y + 1].len);
+                    r = 0;
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][field:%s]  Warning cut off",
+                        param->thread_id, r, path.c_str(), line_no,
+                        tlatn.table_lead.c_str(),
+                        (int)vt_table_fields_name.size(),
+                        vt_test_tb_field_info_t[y + 1].name.c_str());
+                    std::string s = std::string(vt_data[y].ptr, vt_data[y].len);
+                    p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, s.c_str(), s.size());
+                }
+                else {
+                    insert_value_string += std::string(vt_data[y].ptr, vt_data[y].len);
+                }
+
+                insert_value_string += "\'";
+
+            }
+            else {
+                insert_value_string +=
+                    std::string(vt_data[y].ptr, vt_data[y].len);
+            }
+        }
+    }
+
+    return r;
+
+}
+
+
+// 为表产生数据  
+static int general_data_for_table(void * _param, size_t table_index)
+{
+    int r = 0;
+    thread_param_insert_table_general_t * param = (thread_param_insert_table_general_t *)_param;
+
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+
+    // 当前没有数据文件 走生成数据路线  
+    struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+    // 对集合初始化默认数据  
+    //根据表名前缀找到表结构  
+    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+        param->map_test_table_file_info_t->find(tlatn.table_lead);
+    // 没有找到 见鬼了  
+    if (iter == param->map_test_table_file_info_t->end()) {
+        // 打印错误 并退出   
+        r = ENOENT;
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] not found",
+            param->thread_id, r, tlatn.table_lead.c_str());
+        param->exited = true;
+        return r;
+    }
+
+    struct test_table_file_info_t& ttfi = iter->second;
+    std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+    std::vector <struct field_increase_store_t>& vt_field_increase_store_t = itri.vt_field_increase_store_t;
+
+    // 核心设置 不走打开文件路线  
+    itri.is_use_file = false;
+
+    // 表名字 指的是自己的表名字  
+    if (itri.table_name.empty()) {
+        itri.table_name = tlatn.table_name;
+    }
+
+    // 仅仅是带头大哥拥有字段列表就可以了 其他不需要 因为都是相同的 可以最大限度节省内存  
+    if (itri.is_head_in_thread) {
+        // 字段列表为空 
+        if (itri.fields.empty()) {
+            vt_field_increase_store_t.resize(vt_test_tb_field_info_t.size());
+            // 带头大哥初始化一次足够  
+            r = init_data_for_batch_by_default(
+                vt_field_increase_store_t,
+                vt_test_tb_field_info_t,
+                param->start_time,
+                param->step_time);
+            if (0 != r) {
+                // 打印错误 并退出   
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] init_data_for_batch_by_default failed",
+                    param->thread_id, r, tlatn.table_lead.c_str());
+                return r;
+            }
+
+            // 带头大哥初始化一次足够 字段列表    
+            // 字段列表(包括time) 逗号分割  
+            // 产生一行字段  
+            r = generate_field_for_one_line(vt_test_tb_field_info_t, 0, ",", itri.fields);
+            if (0 != r) {
+                // 打印错误 并退出   
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] generate_field_for_one_line failed",
+                    param->thread_id, r, tlatn.table_lead.c_str());
+                return r;
+            }
+
+            //itri.line_count++;
+        }
+    }
+
+    // 仅仅是带头大哥拥有字段列表就可以了 其他不需要 因为都是相同的 可以最大限度节省内存  
+    if (itri.is_head_in_thread) {
+        // 带头大哥拥有数据 其他小弟不用数据即可  
+        // 数据集合 (a, b, c) (d, e, f) 这种形式 可能有一个或者多个   
+        std::string line;
+        // 产生一行数据  
+        r = generate_data_for_one_line(vt_field_increase_store_t, vt_test_tb_field_info_t, 0, ",", line);
+        if (0 != param->r) {
+            // 打印错误 并退出   
+            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] generate_data_for_one_line failed",
+                param->thread_id, r, tlatn.table_lead.c_str());
+            return r;
+        }
+        itri.datas += "(";
+        itri.datas += line;
+        itri.datas += ")";
+    }
+
+    return r;
+}
+
+
+// 从文件中获取数据   
+static int get_data_from_file_for_table(void* _param, size_t table_index, std::vector<std::string>& vt_path, std::vector<size_t>& current_vt_table_index)
+{
+    int r = 0;
+
+    thread_param_insert_table_general_t* param = (thread_param_insert_table_general_t*)_param;
+    struct table_lead_and_table_name_t &tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    // 已经存在路径，走导入数据路线 这个地方会分两处 一种是根据存在数据分别导入不同的表中  
+    //std::vector<std::string>& vt_path = it->second;
+    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+    // 不是带头大哥的话  直接忽略  
+    if (!itri.is_head_in_thread) {
+        itri.is_use_file = true;
+        itri.table_name = tlatn.table_name;
+        return r;
+    }
+
+    itri.is_use_file = true;
+    itri.table_name = tlatn.table_name;
+
+    // 全部都执行完了 结束吧!!!  
+    if (itri.index_in_file_path >= vt_path.size()) {
+        return r;
+    }
+    std::string& path = vt_path[itri.index_in_file_path];
+    std::vector<std::string>& vt_table_fields_name = itri.vt_table_fields_name;
+    //std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = itri.vt_test_tb_field_info_t;
+
+    // 当前table数据文件是否已经关闭  
+    if (itri.is_end_of_file) {
+        return r;
+    }
+
+    //判断当前是否是带头大哥 只有他才有权打开文件  
+
+        // 是否已经打开  
+    if (!itri.is_file_open) {
+        p->tools->path_to_os(&path[0]);
+        r = itri.fo.open_by_read(path.c_str());
+        if (0 != param->r) {
+            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s] open table data path failed",
+                param->thread_id, r, path.c_str());
+            return r;
+        }
+        itri.is_file_open = true;
+        itri.line_no = 0;
+    }
+
+
+    std::vector<tsdb_str>  vt_data;
+    std::vector<BOOL> vt_data_is_string;
+    int data_count = 0;
+    const char* sep = DEFAULT_CSV_FILE_SEP;
+
+    //从csv文件中获取一行并格式化  
+    r = get_format_line_from_csv_file(itri.fo, sep, vt_data, vt_data_is_string);
+    if (0 != r) {
+        if (ENODATA == r) {
+            itri.fo.close();
+            itri.is_end_of_file = true;
+            // 查找下一个文件吧   
+            itri.index_in_file_path++;
+            return r;
+        }
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d] get_format_line_from_csv_file failed",
+            param->thread_id, param->r, path.c_str(), (itri.line_no+1));
+        param->exited = true;
+        return NULL;
+    }
+
+    itri.line_no++;
+
+
+    //根据表名前缀找到表结构  
+    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+        param->map_test_table_file_info_t->find(tlatn.table_lead);
+    // 没有找到 见鬼了  
+    if (iter == param->map_test_table_file_info_t->end()) {
+        // 打印错误 并退出   
+        param->r = ENOENT;
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s] not found",
+            param->thread_id, param->r, path.c_str(), (itri.line_no+1), tlatn.table_lead.c_str());
+        param->exited = true;
+        return NULL;
+    }
+
+    struct test_table_file_info_t& ttfi = iter->second;
+    ttfi.vt_test_tb_field_info_t;
+
+    // 主键字段名字  
+    std::string& primary_key_field_name = ttfi.primary_key_field_name;
+
+    // 指示表名后缀关联的字段名字  
+    std::string& table_tail_field_name = ttfi.table_tail_field_name;
+
+    // 字段列表数组 注意 index = 0 为 主键(time) 下面找对应的字段时需要注意   
+    std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+    // 如果是首次 此行数据为表的字段名字  
+    if (0 == itri.line_no) {
+        vt_table_fields_name.resize(vt_data.size());
+        for (size_t j = 0; j < vt_table_fields_name.size(); j++) {
+            vt_table_fields_name[j].assign(vt_data[j].ptr, vt_data[j].len);
+        }
+
+
+        // 冗余检查 对照下字段名字和表文件中的字段名字个数是否相等  vt_test_tb_field_info_t 首个是主键  
+        if (vt_table_fields_name.size() != vt_test_tb_field_info_t.size() - 1) {
+            param->r = ENOENT;
+            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][vt_test_tb_field_info_t:%d] not equal",
+                param->thread_id, param->r, path.c_str(), (itri.line_no+1),
+                tlatn.table_lead.c_str(),
+                (int)vt_table_fields_name.size(),
+                (int)vt_test_tb_field_info_t.size());
+            param->exited = true;
+            return NULL;
+        }
+
+
+        // 冗余检查 对照下字段名字和表文件中的字段名字是否相同  
+        for (size_t k = 1; k < vt_test_tb_field_info_t.size(); k++)
+        {
+            if (vt_test_tb_field_info_t[k].name != vt_table_fields_name[k - 1]) {
+                param->r = ENOENT;
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][std_field:%s][data_field:%s] field mismatch",
+                    param->thread_id, param->r, path.c_str(), itri.line_no,
+                    tlatn.table_lead.c_str(),
+                    vt_test_tb_field_info_t[k].name.c_str(),
+                    vt_table_fields_name[k - 1].c_str());
+                param->exited = true;
+                return NULL;
+            }
+        }
+
+        //后续执行 忽略  
+        return r;
+    }
+
+    // 冗余性检查 字段个数 与 数据字段个数 必须相等 否则无法解析 可能文件损坏 或者csv 解析有bug     
+    if (vt_data.size() != vt_table_fields_name.size()) {
+
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][vt_data:%d]  ignore size mismatch",
+            param->thread_id, param->r, path.c_str(), itri.line_no,
+            tlatn.table_lead.c_str(),
+            (int)vt_table_fields_name.size(),
+            (int)vt_data.size());
+        //param->exited = true;
+        //param->r = EFAULT;
+        //return NULL;
+        return r;
+    }
+
+    // 查看字段是否为空  
+    if (itri.fields.empty()) {
+        // TODO : 查看 是否需要分别投递到各个表中 如果需要的话 则分别投递  否则直接放在 带头大哥这里就好了  
+        param->r = generate_field_for_one_line(vt_test_tb_field_info_t, 0, ",", itri.fields);
+        if (0 != param->r) {
+            // TODO:
+            return NULL;
+        }
+    }
+
+    //查找表名后缀 从获取的数据中  
+    std::string table_name;
+    param->r = find_table_tail(_param, table_index, path, vt_data, table_name);
+    if (0 != param->r) {
+        // TODO:
+        return NULL;
+    }
+
+    std::string insert_value_string;
+
+
+    size_t primary_key_index = -1;
+
+    // 查找到主键的索引号    
+    param->r = find_primary_key_index(
+        _param,
+        table_index,
+        path,
+        vt_table_fields_name,
+        primary_key_field_name,
+        primary_key_index);
+    if (0 != param->r) {
+        // TODO 
+    }
+
+
+
+    // 解析出一行数据来  
+    // 从文件中获取一行数据并将解析为一个字符串 为 values (使用这里)  
+    param->r = parse_data_to_insert_value_string_from_file(
+        _param,
+        table_index,
+        path,
+        vt_data,
+        primary_key_field_name,
+        primary_key_index,
+        insert_value_string);
+    if (0 != param->r) {
+        // TODO 
+    }
+
+
+
+    // 如果是为空 分发给各个表  
+    // 如果不为空 则发送给指定的表  
+    if (table_name.empty()) {
+        // 仅仅给带头大哥就可以了  
+        itri.datas += "(";
+        itri.datas += insert_value_string;
+        itri.datas += ")";
+        //itri.line_count++;
+    }
+    else { // 查找当前是否已经存在table_name了  注意有可能目前还没有赋值呢  
+        for (size_t k = 0; k < current_vt_table_index.size(); k++) {
+            struct table_lead_and_table_name_t& tlatn_tmp =
+                (*param->vt_table_lead_and_table_name_t)[current_vt_table_index[k]];
+            if (table_name == tlatn_tmp.table_name) {
+                struct insert_table_runtime_info_t& itri_tmp =
+                    (*param->vt_insert_table_runtime_info_t)[current_vt_table_index[k]];
+                itri_tmp.datas += "(";
+                itri_tmp.datas += insert_value_string;
+                itri_tmp.datas += ")";
+                //itri_tmp.line_count++;
+            }
+        }
+    }
+
+    ////////////////////////
+
+
+                
+
+
+
+    return r;
+}
+
+/**
+ * @brief  将本线程所有的表名前缀进行分组(返回table_index列表和表名列表)  
+ * @param[in]  void * _param,                                           线程参数  
+ * @param[out] std::vector<std::vector<size_t> > &vt_vt_table_index     返回vector 每个vector中的内容为*param->vt_table_lead_and_table_name_t索引下标  
+ * @param[out] std::vector<std::vector<std:string> > &vt_vt_table_name  返回vector 每个vector中的内容为表名  
+ * @return  0 成功 其他 失败  
+ */
+static int group_by_table_name_prefix(
+    void * _param, 
+    std::vector<std::vector<size_t> > &vt_vt_table_index, 
+    std::vector<std::vector<std::string> > &vt_vt_table_name)
+{
+    int r = 0;
+    std::vector<size_t> vt_table_index;
+    std::vector<std::string> vt_table_name;
+
+    thread_param_insert_table_general_t * param = (thread_param_insert_table_general_t *)_param;
+
+    std::string table_lead;
+    for (uint32_t table_index_in_thread = 0; table_index_in_thread < param->insert_need; ++table_index_in_thread) {
+        size_t table_index = table_index_in_thread + param->insert_from;
+        struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+        // 如果为空的话  
+        if (table_lead.empty()) {
+            table_lead = tlatn.table_lead;
+        }
+
+        if (table_lead != tlatn.table_lead) {
+            vt_vt_table_index.push_back(vt_table_index);
+            vt_vt_table_name.push_back(vt_table_name);
+            vt_table_index.resize(0);
+            vt_table_name.resize(0);
+            table_lead = tlatn.table_lead;
+        }
+        vt_table_index.push_back(table_index);
+        vt_table_name.push_back(tlatn.table_name);
+    }
+    vt_vt_table_index.push_back(vt_table_index);
+    vt_vt_table_name.push_back(vt_table_name);
+
+
+    return r;
+}
+
+
+void * insert_table_general_thread( void * _param )
+{
+    thread_param_insert_table_general_t * param = (thread_param_insert_table_general_t *)_param;
+
+    // get RTDB interface from TLS(thread local storage).
+    // We strongly recommend that you only call this function where you need it,
+    // and without storage the pointer for later use.
+    tsdb_v3_t * p = rtdb_tls();
+    assert( p );
+
+    // The 'tools' structure contains many functions that we prepared for you.
+    // you will see a lot of code call these functions via the 'tools'.
+
+    // calc the table count that We need to insert. 
+    param->insert_need = (uint32_t)( param->vt_table_lead_and_table_name_t->size() / (size_t)param->thread_count );
+    // calc which index should I start with.
+    param->insert_from = param->insert_need * param->thread_id;
+    if ( param->thread_id == param->thread_count - 1 ) {
+        // in last thread, we need add the remainder.
+        param->insert_need += (uint32_t)( param->vt_table_lead_and_table_name_t->size() % (size_t)param->thread_count );
+    }
+
+    // USE DB
+    param->r = param->conn->select_db( param->db );
+    if ( unlikely( 0 != param->r ) ) {
+        TSDB_ERROR( p, "[r=%d][db=%s] select_db failed", param->r, param->db );
+        return NULL;
+    }
+
+    // insert into each tables
+    param->insert_line_count = 0;
+    bool is_no_data_to_insert_table = false;
+
+    std::vector<std::vector<size_t> > vt_vt_table_index;
+
+#if 0
+    std::vector<size_t> vt_table_index;
+    
+
+    // 将所有表分为几段  按表名相同划分    
+    std::string table_lead;
+    for (uint32_t table_index_in_thread = 0; table_index_in_thread < param->insert_need; ++table_index_in_thread) {
+        size_t table_index = table_index_in_thread + param->insert_from;
+        struct table_lead_and_table_name_t& tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+        // 如果为空的话  
+        if (table_lead.empty()) {
+            table_lead = tlatn.table_lead;
+        }
+
+        if (table_lead != tlatn.table_lead) {
+            vt_vt_table_index.push_back(vt_table_index);
+            vt_table_index.resize(0);
+            table_lead = tlatn.table_lead;
+        }
+        vt_table_index.push_back(table_index);
+    }
+    vt_vt_table_index.push_back(vt_table_index);
+#endif
+
+    // 重新梳理 vt_table_lead_and_table_name_t 关键信息 如是否是带头大哥 带头大哥索引号 最尾索引号   
+    for (size_t i = 0; i < vt_vt_table_index.size(); i++)
+    {
+        std::vector<size_t>& my_vt_table_index = vt_vt_table_index[i];
+        for (size_t j = 0; j < my_vt_table_index.size(); j++)
+        {
+            size_t& table_index = my_vt_table_index[0];
+
+            if (0 == j) {
+                (*param->vt_insert_table_runtime_info_t)[table_index].is_head_in_thread = true;
+            }
+            else {
+                (*param->vt_insert_table_runtime_info_t)[table_index].is_head_in_thread = false;
+            }
+
+            (*param->vt_insert_table_runtime_info_t)[table_index].head_index_in_thread = my_vt_table_index[0];
+            (*param->vt_insert_table_runtime_info_t)[table_index].tail_index_in_thread = my_vt_table_index[my_vt_table_index.size() - 1];
+        }
+    }
+
+
+    while ( true ) {
+
+        // 先尝试关闭  
+        is_no_data_to_insert_table = true; 
+        
+        for (size_t i=0; i<vt_vt_table_index.size(); i++)
+        {
+            std::vector<size_t>& current_vt_table_index = vt_vt_table_index[i];
+            for (size_t j=0; j< current_vt_table_index.size(); j++)
+            {
+                size_t table_index = current_vt_table_index[j];
+                struct table_lead_and_table_name_t &tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+                std::map < std::string, std::vector<std::string> >::iterator it =
+                    param->map_vt_table_head_data_path->find(tlatn.table_lead);
+                if (it == param->map_vt_table_head_data_path->end() || it->second.empty()) {
+                    // 当前没有数据文件 走生成数据路线  
+
+                    // 为表产生数据  
+                    param->r =  general_data_for_table(param, table_index);
+                    if (0 != param->r) {
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s][table_name:%s] general_data_for_table failed",
+                            param->thread_id, param->r, tlatn.table_lead.c_str(), tlatn.table_name.c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+#if 0
+
+                    struct insert_table_runtime_info_t &itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+
+                    // 对集合初始化默认数据  
+                    //根据表名前缀找到表结构  
+                    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+                        param->map_test_table_file_info_t->find(tlatn.table_lead);
+                    // 没有找到 见鬼了  
+                    if (iter == param->map_test_table_file_info_t->end()) {
+                        // 打印错误 并退出   
+                        param->r = ENOENT;
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] not found",
+                            param->thread_id, param->r, tlatn.table_lead.c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+
+                    struct test_table_file_info_t& ttfi = iter->second;
+                    std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+                    std::vector <struct field_increase_store_t> &vt_field_increase_store_t = itri.vt_field_increase_store_t;
+                    
+                    // 核心设置 不走打开文件路线  
+                    itri.is_use_file = false;
+
+                    // 表名字 指的是自己的表名字  
+                    if (itri.table_name.empty()) {
+                        itri.table_name = tlatn.table_name;
+                    }
+
+                    // 仅仅是带头大哥拥有字段列表就可以了 其他不需要 因为都是相同的 可以最大限度节省内存  
+                    if (itri.is_head_in_thread) {
+                        // 字段列表为空 
+                        if (itri.fields.empty()) {
+                            vt_field_increase_store_t.resize(vt_test_tb_field_info_t.size());
+                            // 带头大哥初始化一次足够  
+                            param->r = init_data_for_batch_by_default(
+                                vt_field_increase_store_t,
+                                vt_test_tb_field_info_t,
+                                param->start_time,
+                                param->step_time);
+                            if (0 != param->r) {
+                                // 打印错误 并退出   
+                                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] init_data_for_batch_by_default failed",
+                                    param->thread_id, param->r, tlatn.table_lead.c_str());
+                                param->exited = true;
+                                return NULL;
+                            }
+                            
+                            // 带头大哥初始化一次足够 字段列表    
+                            // 字段列表(包括time) 逗号分割  
+                            // 产生一行字段  
+                            param->r = generate_field_for_one_line(vt_test_tb_field_info_t, 0, ",", itri.fields);
+                            if (0 != param->r) {
+                                // 打印错误 并退出   
+                                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] generate_field_for_one_line failed",
+                                    param->thread_id, param->r, tlatn.table_lead.c_str());
+                                param->exited = true;
+                                return NULL;
+                            }
+                        }
+                    }
+                    
+                    // 仅仅是带头大哥拥有字段列表就可以了 其他不需要 因为都是相同的 可以最大限度节省内存  
+                    if (itri.is_head_in_thread) {
+                        // 带头大哥拥有数据 其他小弟不用数据即可  
+                        // 数据集合 (a, b, c) (d, e, f) 这种形式 可能有一个或者多个   
+                        std::string line;
+                        // 产生一行数据  
+                        param->r = generate_data_for_one_line(vt_field_increase_store_t, vt_test_tb_field_info_t, 0, ",", line);
+                        if (0 != param->r) {
+                            // 打印错误 并退出   
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] generate_data_for_one_line failed",
+                                param->thread_id, param->r, tlatn.table_lead.c_str());
+                            param->exited = true;
+                            return NULL;
+                        }
+                        itri.datas += "(";
+                        itri.datas += line;
+                        itri.datas += ")";
+                    }
+#endif
+                }
+                else { // 已经存在路径，走导入数据路线 这个地方会分两处 一种是根据存在数据分别导入不同的表中  
+                    std::vector<std::string> &vt_path = it->second;
+
+                    // 从文件中获取数据  
+                    param->r = get_data_from_file_for_table(param, table_index, vt_path, current_vt_table_index);
+                    if (0 != param->r) {
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s][table_name:%s] general_data_for_table failed",
+                            param->thread_id, param->r, tlatn.table_lead.c_str(), tlatn.table_name.c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+#if 0
+
+                    struct insert_table_runtime_info_t& itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+                    
+                    // 不是带头大哥的话  直接忽略  
+                    if (!itri.is_head_in_thread) {
+                        itri.is_use_file = true;
+                        itri.table_name = tlatn.table_name;
+                        continue;
+                    }
+
+                    itri.is_use_file = true;
+                    itri.table_name = tlatn.table_name;
+                    
+                    // 全部都执行完了 结束吧!!!  
+                    if (itri.index_in_file_path >= vt_path.size() ) {
+                        continue;
+                    }
+                    std::string &path = vt_path[itri.index_in_file_path];
+                    std::vector<std::string> &vt_table_fields_name  = itri.vt_table_fields_name; 
+                    //std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = itri.vt_test_tb_field_info_t;
+
+                    // 当前table数据文件是否已经关闭  
+                    if (itri.is_end_of_file) {
+                        continue;
+                    }
+                    
+                    //判断当前是否是带头大哥 只有他才有权打开文件  
+                    
+                        // 是否已经打开  
+                    if (!itri.is_file_open) {
+                        p->tools->path_to_os(&path[0]);
+                        param->r = itri.fo.open_by_read(path.c_str());
+                        if (0 != param->r) {
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s] open table data path failed",
+                                param->thread_id, param->r, path.c_str());
+                            break;
+                        }
+                        itri.is_file_open = true;
+                        itri.line_no = 0;
+                    }
+
+
+                    std::vector<tsdb_str>  vt_data;
+                    std::vector<BOOL> vt_data_is_string;
+                    int data_count = 0;
+                    const char* sep = DEFAULT_CSV_FILE_SEP;
+
+                    //从csv文件中获取一行并格式化  
+                    param->r = get_format_line_from_csv_file(itri.fo, sep, vt_data, vt_data_is_string);
+                    if (0 != param->r) {
+                        if (ENODATA == param->r) {
+                            itri.fo.close();
+                            itri.is_end_of_file = true;
+                            // 查找下一个文件吧   
+                            itri.index_in_file_path++;
+                            continue;
+                        }
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d] get_format_line_from_csv_file failed",
+                            param->thread_id, param->r, path.c_str(), itri.line_no);
+                        param->exited = true;
+                        return NULL;
+                    }
+
+                    itri.line_no++;
+
+                    is_no_data_to_insert_table = false;
+
+                    //根据表名前缀找到表结构  
+                    std::map<std::string, struct test_table_file_info_t>::iterator iter =
+                        param->map_test_table_file_info_t->find(tlatn.table_lead);
+                    // 没有找到 见鬼了  
+                    if (iter == param->map_test_table_file_info_t->end()) {
+                        // 打印错误 并退出   
+                        param->r = ENOENT;
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s] not found",
+                            param->thread_id, param->r, path.c_str(), itri.line_no, tlatn.table_lead.c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+
+                    struct test_table_file_info_t& ttfi = iter->second;
+                    ttfi.vt_test_tb_field_info_t;
+
+                    // 主键字段名字  
+                    std::string& primary_key_field_name = ttfi.primary_key_field_name;
+
+                    // 指示表名后缀关联的字段名字  
+                    std::string& table_tail_field_name = ttfi.table_tail_field_name;
+
+                    // 字段列表数组 注意 index = 0 为 主键(time) 下面找对应的字段时需要注意   
+                    std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+                    // 如果是首次 此行数据为表的字段名字  
+                    if (0 == itri.line_no) {
+                        vt_table_fields_name.resize(vt_data.size());
+                        for (size_t j = 0; j < vt_table_fields_name.size(); j++) {
+                            vt_table_fields_name[j].assign(vt_data[j].ptr, vt_data[j].len);
+                        }
+
+
+                        // 冗余检查 对照下字段名字和表文件中的字段名字个数是否相等  vt_test_tb_field_info_t 首个是主键  
+                        if (vt_table_fields_name.size() != vt_test_tb_field_info_t.size() - 1) {
+                            param->r = ENOENT;
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][vt_test_tb_field_info_t:%d] not equal",
+                                param->thread_id, param->r, path.c_str(), itri.line_no,
+                                tlatn.table_lead.c_str(),
+                                (int)vt_table_fields_name.size(),
+                                (int)vt_test_tb_field_info_t.size());
+                            param->exited = true;
+                            return NULL;
+                        }
+
+
+                        // 冗余检查 对照下字段名字和表文件中的字段名字是否相同  
+                        for (size_t k = 1; k < vt_test_tb_field_info_t.size(); k++)
+                        {
+                            if (vt_test_tb_field_info_t[k].name != vt_table_fields_name[k - 1]) {
+                                param->r = ENOENT;
+                                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][std_field:%s][data_field:%s] field mismatch",
+                                    param->thread_id, param->r, path.c_str(), itri.line_no,
+                                    tlatn.table_lead.c_str(),
+                                    vt_test_tb_field_info_t[k].name.c_str(),
+                                    vt_table_fields_name[k - 1].c_str());
+                                param->exited = true;
+                                return NULL;
+                            }
+                        }
+
+                        //后续执行 忽略  
+                        continue;
+                    }
+
+                    // 冗余性检查 字段个数 与 数据字段个数 必须相等 否则无法解析 可能文件损坏 或者csv 解析有bug     
+                    if (vt_data.size() != vt_table_fields_name.size()) {
+
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][vt_data:%d]  ignore size mismatch",
+                            param->thread_id, param->r, path.c_str(), itri.line_no,
+                            tlatn.table_lead.c_str(),
+                            (int)vt_table_fields_name.size(),
+                            (int)vt_data.size());
+                        //param->exited = true;
+                        //param->r = EFAULT;
+                        //return NULL;
+                        continue;
+                    }
+
+                    // 查看字段是否为空  
+                    if (itri.fields.empty()) {
+                        // TODO : 查看 是否需要分别投递到各个表中 如果需要的话 则分别投递  否则直接放在 带头大哥这里就好了  
+                        param->r = generate_field_for_one_line(vt_test_tb_field_info_t, 0, ",", itri.fields);
+                        if (0 != param->r) {
+                            // TODO:
+                            return NULL;
+                        }
+                    }
+
+                    //查找表名后缀 从获取的数据中  
+                    std::string table_name;
+                    param->r = find_table_tail(_param, table_index, path, vt_data, table_name);
+                    if (0 != param->r) {
+                        // TODO:
+                        return NULL;
+                    }
+
+                    std::string insert_value_string;
+
+
+                    size_t primary_key_index = -1;
+
+                    // 查找到主键的索引号    
+                    param->r = find_primary_key_index(
+                        _param,
+                        table_index,
+                        path,
+                        vt_table_fields_name,
+                        primary_key_field_name,
+                        primary_key_index);
+                    if (0 != param->r) {
+                        // TODO 
+                    }
+                    
+
+
+                    // 解析出一行数据来  
+                    // 从文件中获取一行数据并将解析为一个字符串 为 values (使用这里)  
+                    param->r = parse_data_to_insert_value_string_from_file(
+                        _param,
+                        table_index,
+                        path,
+                        vt_data,
+                        primary_key_field_name,
+                        primary_key_index,
+                        insert_value_string);
+                    if (0 != param->r) {
+                        // TODO 
+                    }
+
+
+
+                    // 如果是为空 分发给各个表  
+                    // 如果不为空 则发送给指定的表  
+                    if (table_name.empty()) {
+                        // 仅仅给带头大哥就可以了  
+                        itri.datas += "(";
+                        itri.datas += insert_value_string;
+                        itri.datas += ")";
+                        //itri.line_count++;
+                    }
+                    else { // 查找当前是否已经存在table_name了  注意有可能目前还没有赋值呢  
+                        for (size_t k = 0; k <current_vt_table_index.size();k ++) {
+                            struct table_lead_and_table_name_t &tlatn_tmp = 
+                                (*param->vt_table_lead_and_table_name_t)[current_vt_table_index[k]];
+                            if (table_name == tlatn_tmp.table_name) {
+                                struct insert_table_runtime_info_t& itri_tmp = 
+                                    (*param->vt_insert_table_runtime_info_t)[current_vt_table_index[k]];
+                                itri_tmp.datas += "(";
+                                itri_tmp.datas += insert_value_string;
+                                itri_tmp.datas += ")";
+                                //itri_tmp.line_count++;
+                            }
+                        }
+                    }
+
+#endif                  ////////////////////////
+                }
+            }
+
+
+            // 写完一轮 需要检查 是否需要将数据写入表中了  
+            for (size_t j = 0; j < current_vt_table_index.size(); j++)
+            {
+                // TODO : 生成插入表数据  
+                // 清理数据了  
+            }
+
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+        // insert every table
+        for ( uint32_t table_index_in_thread = 0; table_index_in_thread < param->insert_need; ++ table_index_in_thread ) {
+
+            // calc the real index in global array.
+            size_t table_index = table_index_in_thread + param->insert_from;
+
+            struct table_lead_and_table_name_t &tlatn = (*param->vt_table_lead_and_table_name_t)[table_index];
+
+            std::map < std::string, std::vector<std::string> >::iterator it = 
+            param->map_vt_table_head_data_path->find(tlatn.table_lead);
+            if (it == param->map_vt_table_head_data_path->end() || it->second.empty()) {
+                // TODO 当前没有数据文件 走生成数据路线  
+
+                // 对集合初始化默认数据  
+                //根据表名前缀找到表结构  
+                std::map<std::string, struct test_table_file_info_t>::iterator iter =
+                    param->map_test_table_file_info_t->find(tlatn.table_lead);
+                // 没有找到 见鬼了  
+                if (iter == param->map_test_table_file_info_t->end()) {
+                    // 打印错误 并退出   
+                    param->r = ENOENT;
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] not found",
+                        param->thread_id, param->r, tlatn.table_lead.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
+
+                struct test_table_file_info_t& ttfi = iter->second;
+                std::vector<struct test_tb_field_info_t> &vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+               
+                std::vector <struct field_increase_store_t> vt_field_increase_store_t;
+                vt_field_increase_store_t.resize(vt_test_tb_field_info_t.size());
+                param->r =  init_data_for_batch_by_default(
+                vt_field_increase_store_t,
+                vt_test_tb_field_info_t,
+                param->start_time, 
+                param->step_time);
+                if (0 != param->r) {
+                    // 打印错误 并退出   
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] init_data_for_batch_by_default failed",
+                        param->thread_id, param->r, tlatn.table_lead.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
+
+                std::string field;
+
+                // 产生一行字段  
+                param->r =  generate_field_for_one_line(vt_test_tb_field_info_t, 0, ",", field);
+                if (0 != param->r) {
+                    // 打印错误 并退出   
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] generate_field_for_one_line failed",
+                        param->thread_id, param->r, tlatn.table_lead.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
+
+                std::string line;
+                // 产生一行数据  
+                param->r =  generate_data_for_one_line(vt_field_increase_store_t,vt_test_tb_field_info_t, 0, ",", line);
+                if (0 != param->r) {
+                    // 打印错误 并退出   
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table_lead:%s] generate_data_for_one_line failed",
+                        param->thread_id, param->r, tlatn.table_lead.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
+
+                // 生成命令  
+                // INSERT INTO t(filed) values
+
+                // 第二条就是 "(" + line +")"    
+               
+
+
+
+            }
+            else { // 已经存在路径，走导入数据路线  
+                //
+            }
+
+            struct table_lead_and_table_path_t tlatp = {tlatn.table_lead, it->second[0]};
+            struct insert_table_runtime_info_t & itri = (*param->vt_insert_table_runtime_info_t)[table_index];
+           
+            file_operation &fo = itri.fo;
+            int &line_no = itri.line_no;
+            std::vector<std::string> &vt_table_fields_name  = itri.vt_table_fields_name; 
+            volatile uint64_t &start_time = itri.start_time;
+
+
+            // 当前table数据文件是否已经关闭  
+            if (itri.is_end_of_file) {
+                continue;
+            }
+
+            // 是否已经打开  
+            if (!itri.is_file_open) {
+                param->r = fo.open_by_read(tlatp.table_path.c_str());
+                if (0 != param->r) {
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s] open table data path failed",
+                        param->thread_id, param->r, tlatp.table_path.c_str());
+                    break;
+                }
+                itri.is_file_open = true;
+            }
+            
+            
+        
+            std::vector<tsdb_str>  vt_data;
+            std::vector<BOOL> vt_data_is_string;
+            int data_count = 0;
+            const char* sep = DEFAULT_CSV_FILE_SEP;
+
+            //从csv文件中获取一行并格式化  
+            param->r = get_format_line_from_csv_file(fo, sep, vt_data, vt_data_is_string);
+            if (0 != param->r) {
+                if (ENODATA == param->r) {
+                    fo.close();
+                    itri.is_end_of_file = true;
+                    continue;;
+                }
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d] get_format_line_from_csv_file failed",
+                    param->thread_id, param->r, tlatp.table_path.c_str(), line_no);
+                param->exited = true;
+                return NULL;
+            }
+
+            line_no++;
+
+            is_no_data_to_insert_table = false;
+
+
+            //根据表名前缀找到表结构  
+            std::map<std::string, struct test_table_file_info_t>::iterator iter =
+                param->map_test_table_file_info_t->find(tlatp.table_lead);
+            // 没有找到 见鬼了  
+            if (iter == param->map_test_table_file_info_t->end()) {
+                // 打印错误 并退出   
+                param->r = ENOENT;
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s] not found",
+                    param->thread_id, param->r, tlatp.table_path.c_str(), line_no, tlatp.table_lead.c_str());
+                param->exited = true;
+                return NULL;
+            }
+
+            struct test_table_file_info_t& ttfi = iter->second;
+            ttfi.vt_test_tb_field_info_t;
+
+            // 主键字段名字  
+            std::string& primary_key_field_name = ttfi.primary_key_field_name;
+
+            // 指示表名后缀关联的字段名字  
+            std::string& table_tail_field_name = ttfi.table_tail_field_name;
+
+            // 字段列表数组 注意 index = 0 为 主键(time) 下面找对应的字段时需要注意   
+            std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t = ttfi.vt_test_tb_field_info_t;
+
+            // 如果是首次 此行数据为表的字段名字  
+            if (0 == line_no) {
+                vt_table_fields_name.resize(vt_data.size());
+                for (size_t j = 0; j < vt_table_fields_name.size(); j++) {
+                    vt_table_fields_name[j].assign(vt_data[j].ptr, vt_data[j].len);
+                }
+
+
+                // 冗余检查 对照下字段名字和表文件中的字段名字个数是否相等  vt_test_tb_field_info_t 首个是主键  
+                if (vt_table_fields_name.size() != vt_test_tb_field_info_t.size() - 1) {
+                    param->r = ENOENT;
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][vt_test_tb_field_info_t:%d] not equal",
+                        param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                        tlatp.table_lead.c_str(),
+                        (int)vt_table_fields_name.size(),
+                        (int)vt_test_tb_field_info_t.size());
+                    param->exited = true;
+                    return NULL;
+                }
+
+
+                // 冗余检查 对照下字段名字和表文件中的字段名字是否相同  
+                for (size_t k = 1; k < vt_test_tb_field_info_t.size(); k++)
+                {
+                    if (vt_test_tb_field_info_t[k].name != vt_table_fields_name[k - 1]) {
+                        param->r = ENOENT;
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][std_field:%s][data_field:%s] field mismatch",
+                            param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                            tlatp.table_lead.c_str(),
+                            vt_test_tb_field_info_t[k].name.c_str(),
+                            vt_table_fields_name[k - 1].c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+                }
+
+                //后续执行 忽略  
+                continue;
+            }
+
+            // 冗余性检查 字段个数 与 数据字段个数 必须相等 否则无法解析 可能文件损坏 或者csv 解析有bug     
+            if (vt_data.size() != vt_table_fields_name.size()) {
+                
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][vt_data:%d]  ignore size mismatch",
+                    param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                    tlatp.table_lead.c_str(),
+                    (int)vt_table_fields_name.size(),
+                    (int)vt_data.size());
+                //param->exited = true;
+                //param->r = EFAULT;
+                //return NULL;
+                continue;
+            }
+            
+
+
+            // 核心 构建插入语句  "insert into table(, , , , ) values();"
+            // 先查找 table_tail_field_name 对应的字段索引  
+            std::string sql;
+            sql = "INSERT INTO ";
+
+            // 查找表名后缀  
+            std::string table_name;
+            {
+                size_t m = 0;
+                bool is_find = false;
+                for (; m < vt_table_fields_name.size(); ++m) {
+                    if (vt_table_fields_name[m] == table_tail_field_name) {
+                        is_find = true;
+                        break;
+                    }
+                }
+
+                // 没有找到 直接退出  
+                if (!is_find) {
+                    param->r = ENOENT;
+                    // 打印错误 并退出   
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][table_tail_field_name:%s] not found",
+                        param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                        tlatp.table_lead.c_str(), table_tail_field_name.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
+                table_name = tlatp.table_lead;
+                table_name += std::string(vt_data[m].ptr, vt_data[m].len);
+            }
+
+            sql += table_name;
+            sql += " ";
+
+            // 插入数据的字段列表  
+            std::string insert_table_field_list_string;
+            {
+                insert_table_field_list_string += "(";
+
+                for (size_t n = 0; n < vt_table_fields_name.size(); n++)
+                {
+                    if (0 == n) {
+                        // 主键不为空 time 值和 指定主键值相同 否则使用内部自动增长的时间   
+                        // if (!primary_key_field_name.empty()) {
+                        // 更改设计 无论如何均需要带上时间  
+                            insert_table_field_list_string += TSDB_COLUMN_TIME_NAME;
+                            insert_table_field_list_string += ", ";
+                        // }
+                        insert_table_field_list_string += vt_table_fields_name[n];
+                    }
+                    else {
+                        insert_table_field_list_string += ", ";
+                        insert_table_field_list_string += vt_table_fields_name[n];
+
+                    }
+                }
+                insert_table_field_list_string += ")";
+            }
+
+
+            sql += insert_table_field_list_string;
+            sql += " ";
+            sql += " VALUES ";
+            sql += " ( ";
+
+            // 插入字段值  
+            {
+                size_t primary_key_index = size_t(-1);
+                // 主键不为空 time 值和 指定主键值相同 否则使用内部自动增长的时间   
+                if (!primary_key_field_name.empty()) {
+                    for (size_t x = 0; x < vt_table_fields_name.size(); x++)
+                    {
+                        if (primary_key_field_name == vt_table_fields_name[x]) {
+                            primary_key_index = x;
+                            break;
+                        }
+                    }
+
+                    // 判断是否找到主键字段了  
+                    if (primary_key_index == size_t(-1)) {
+                        param->r = ENOENT;
+                        // 打印错误 并退出   
+                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][primary_key_field_name:%s] not found",
+                            param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                            tlatp.table_lead.c_str(), primary_key_field_name.c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+                }
+
+                std::string insert_value_string;
+
+                // 核心中的核心 构造插入的数据  
+                for (size_t y = 0; y < vt_data.size(); y++)
+                {
+                    if (0 == y) {
+                        if (!primary_key_field_name.empty()) {
+                            // 主键确定是存在的  
+                            insert_value_string += "\'";
+                            insert_value_string +=
+                                std::string(vt_data[primary_key_index].ptr, vt_data[primary_key_index].len);
+                            insert_value_string += "\'";
+                            insert_value_string += ", ";
+                        }
+                        else { // 主键为空的话 使用time固定时间  
+                            char start_time_s[64];
+                            int  start_time_sl = (int)sizeof(start_time_s);
+                            p->tools->datetime_to_str(start_time, start_time_s, &start_time_sl);
+                            // 更新时间 方便下次继续使用  
+                            start_time += param->step_time;
+                            insert_value_string += "\'";
+                            insert_value_string += start_time_s;
+                            insert_value_string += "\'";
+                            insert_value_string += ", ";
+                        }
+                    }
+                    else {
+                        insert_value_string += ", ";
+                    }
+
+                    // 此字段数据为空  
+                    if (0 == vt_data[y].len || NULL == vt_data[y].ptr) {
+                        // 检查合法性 是否此字段是否允许为空  
+                        if (!vt_test_tb_field_info_t[y + 1].is_null) {
+                            param->r = EFAULT;
+                            // 打印错误 并退出   
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][field:%s] not allow null",
+                                param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                                tlatp.table_lead.c_str(), vt_test_tb_field_info_t[y + 1].name.c_str());
+                            param->exited = true;
+                            return NULL;
+                        }
+                        insert_value_string += "null";
+                    }
+                    else { // 有数据  
+                        /// string
+                        if (TSDB_DATATYPE_STRING == vt_test_tb_field_info_t[y + 1].datatype ||
+                            TSDB_DATATYPE_DATETIME_MS == vt_test_tb_field_info_t[y + 1].datatype)
+                        {
+                            insert_value_string += "\'";
+
+                            if (TSDB_DATATYPE_STRING == vt_test_tb_field_info_t[y + 1].datatype && 
+                                vt_data[y].len > vt_test_tb_field_info_t[y + 1].len ) {
+
+                                insert_value_string += std::string(vt_data[y].ptr, vt_test_tb_field_info_t[y + 1].len);
+
+                                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][path:%s][line_no:%d][table_lead:%s][vt_table_fields_name:%d][field:%s]  Warning cut off",
+                                    param->thread_id, param->r, tlatp.table_path.c_str(), line_no,
+                                    tlatp.table_lead.c_str(),
+                                    (int)vt_table_fields_name.size(),
+                                    vt_test_tb_field_info_t[y + 1].name.c_str());
+                                std::string s = std::string(vt_data[y].ptr, vt_data[y].len);
+                                p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, s.c_str(), s.size());
+                            }
+                            else {
+                                insert_value_string += std::string(vt_data[y].ptr, vt_data[y].len);
+                            }
+
+                            insert_value_string += "\'";
+
+                        }
+                        else {
+                            insert_value_string +=
+                                std::string(vt_data[y].ptr, vt_data[y].len);
+                        }
+                    }
+
+                }
+
+                sql += insert_value_string;
+                sql += " ) ";
+            }
+
+            // execute the SQL return value stored to param->r.
+            param->r = param->conn->query_non_result(sql.c_str(), sql.size());
+            if (unlikely(0 != param->r)) {
+                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][table:%s][line_no:%d] insert table failed",
+                    param->thread_id, param->r, table_name.c_str(), line_no);
+                p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                param->exited = true;
+                return NULL;
+            }
+            ++param->insert_line_count;
+            //p->tools->sleep_ms(param->step_time);
+        }
+        
+
+        if (is_no_data_to_insert_table) {
+            break;
+        }
+    }
+
+    // quit the thread
+    param->exited = true;
+    return NULL;
+}
+
+int insert_table_general( int argc, char ** argv )
+{
+    // get RTDB interface from TLS(thread local storage).
+    // We strongly recommend that you only call this function where you need it,
+    // and without storage the pointer for later use.
+    tsdb_v3_t * p = rtdb_tls();
+    assert( p );
+
+    // The 'tools' structure contains many functions that we prepared for you.
+    // you will see a lot of code call these functions via the 'tools'.
+
+    int r = 0;
+
+    TSDB_INFO( p, "[INSERT]INSERT into Table" );
+
+    // get db type: RTDB or TDEngine
+    db_type_t engine = get_db_type( argc, argv );
+    if ( DB_UNKNOWN == engine ) {
+        TSDB_ERROR( p, "[INSERT]get_db_type failed" );
+        return r;
+    }
+
+    // -server 127.0.0.1:9000
+    const char * server = NULL;
+    p->tools->find_argv( argc, argv, "server", & server, NULL );
+    if ( NULL == server || '\0' == * server ) {
+        server = "127.0.0.1:9000";
+    }
+    TSDB_INFO( p, "[INSERT][PARAMETERS][server      =%s]", server );
+
+    wide_base_t * engine2 = wide_base_t::instance( engine );
+    if ( NULL == engine2 ) {
+        TSDB_ERROR( p, "[INSERT][type=%d]create instance failed", (int)engine );
+        return EFAULT;
+    }
+
+    // global connect server. RTDB supported just connect server one time.
+    r = engine2->global_connect( server );
+    if ( 0 != r ) {
+        TSDB_ERROR( p, "[INSERT][CONNECT][server=%s]global_connect failed", server );
+        return r;
+    }
+
+    // input file format.
+    const char * format = NULL;
+    p->tools->find_argv( argc, argv, "format", & format, NULL );
+    if ( NULL == format || '\0' == * format ) {
+        format = "txt";
+    }
+    TSDB_INFO( p, "[INSERT][PARAMETERS][format      =%s]", format );
+
+    // input file path
+    std::string path;
+    {
+        const char * _path = NULL;
+        p->tools->find_argv( argc, argv, "path", & _path, NULL );
+        if ( NULL == _path || '\0' == * _path ) {
+            // 允许path为空  
+            _path = "";
+        }
+        path = _path;
+        p->tools->path_to_os( & path[0] );
+    }
+    TSDB_INFO( p, "[INSERT][PARAMETERS][path        =%s]", path.c_str() );
+
+    // insert table thread count
+    int thread_count;
+    p->tools->find_argv_int( argc, argv, "thread", & thread_count );
+    if ( thread_count <= 0 ) {
+        thread_count = p->tools->get_cpu_core_count();
+    }
+    TSDB_INFO( p, "[INSERT][PARAMETERS][thread      =%d]", thread_count );
+
+    // insert table start time
+    uint64_t start_time = 0;
+    p->tools->find_argv_datetime( argc, argv, "start_time", & start_time );
+    if ( 0 == start_time ) {
+        start_time = p->tools->datetime_now();
+    }
+    char start_time_s[ 64 ];
+    int  start_time_sl = (int)sizeof(start_time_s);
+    p->tools->datetime_to_str( start_time, start_time_s, & start_time_sl );
+    TSDB_INFO( p, "[INSERT][PARAMETERS][start_time  =%lld, %s]", start_time, start_time_s );
+
+    // insert table stop time
+    uint64_t stop_time          = 0;
+    uint64_t stop_local_time    = 0;
+    do {
+        const char * s = "";
+        size_t       sl= 0;
+        p->tools->find_argv( argc, argv, "stop_time", & s, & sl );
+        if ( NULL == s || * s <= 0 || 0 == sl ) {
+            break;
+        }
+
+        stop_time = p->tools->datetime_from_str( s, (int)sl );
+        if ( stop_time > 0 ) {
+            break;
+        }
+
+        if ( sl < 2 || ! isdigit( * s ) ) {
+            TSDB_ERROR( p, "[INSERT][PARAMETERS]invalid stop_time: %s", s );
+            break;
+        }
+
+        int n = atoi( s );
+        if ( n <= 0 ) {
+            TSDB_ERROR( p, "[INSERT][PARAMETERS]invalid stop_time: %s", s );
+        }
+        uint64_t now = p->tools->datetime_now();
+        char c = s[ sl - 1 ];
+        if ( 's' == c ) {
+            stop_local_time = now + (uint64_t)1000 * (uint64_t)n;
+        } else if ( 'm' == c ) {
+            stop_local_time = now + (uint64_t)1000 * (uint64_t)60 * (uint64_t)n;
+        } else if ( 'h' == c ) {
+            stop_local_time = now + (uint64_t)1000 * (uint64_t)60 * (uint64_t)60 * (uint64_t)n;
+        } else if ( 'd' == c ) {
+            stop_local_time = now + (uint64_t)1000 * (uint64_t)60 * (uint64_t)60 * (uint64_t)24 * (uint64_t)n;
+        } else if ( 'w' == c ) {
+            stop_local_time = now + (uint64_t)1000 * (uint64_t)60 * (uint64_t)60 * (uint64_t)24 * (uint64_t)7 * (uint64_t)n;
+        } else {
+            TSDB_ERROR( p, "[INSERT][PARAMETERS]invalid stop_time: %s", s );
+        }
+    } while ( 0 );
+    if ( 0 != stop_time ) {
+        char stop_time_s[ 64 ];
+        int  stop_time_sl = (int)sizeof(stop_time_s);
+        char start_time_s[ 64 ];
+        int  start_time_sl = (int)sizeof(start_time_s);
+        p->tools->datetime_to_str( stop_time, stop_time_s, & stop_time_sl );
+        p->tools->datetime_to_str( start_time, start_time_s, & start_time_sl );
+        if ( stop_time < start_time ) {
+            TSDB_ERROR( p, "[INSERT][PARAMETERS][stop_time=%lld, %s][start_time=%lld, %s]invalid time",
+                           (long long)stop_time, stop_time_s, (long long)start_time, start_time_s );
+            return EINVAL;
+        }
+        TSDB_INFO( p, "[INSERT][PARAMETERS][stop_time   =%lld, %s]", (long long)stop_time, stop_time_s );
+    } else {
+        TSDB_INFO( p, "[INSERT][PARAMETERS][stop_time   =NEVER]" );
+    }
+    if ( 0 != stop_local_time ) {
+        char stop_time_s[ 64 ];
+        int  stop_time_sl = (int)sizeof(stop_time_s);
+        p->tools->datetime_to_str( stop_local_time, stop_time_s, & stop_time_sl );
+        TSDB_INFO( p, "[INSERT][PARAMETERS][stop_l_time =%lld, %s]", (long long)stop_local_time, stop_time_s );
+    } else {
+        TSDB_INFO( p, "[INSERT][PARAMETERS][stop_l_time =NEVER]" );
+    }
+
+    // insert table stop line
+    int64_t stop_line = 0;
+    uint64_t stop_line_per_thread;
+    uint64_t stop_line_per_thread_m;
+    p->tools->find_argv_int64( argc, argv, "stop_line", & stop_line );
+    if ( stop_line > 0 ) {
+        stop_line_per_thread    = (uint64_t)(stop_line / (int64_t)thread_count);
+        stop_line_per_thread_m  = (uint64_t)(stop_line % (int64_t)thread_count);
+        TSDB_INFO( p, "[INSERT][PARAMETERS][stop_line   =%lld][stop_line_per_thread=%d]", (long long)stop_line, (long long)stop_line_per_thread );
+    } else {
+        TSDB_INFO( p, "[INSERT][PARAMETERS][stop_line   =NEVER]" );
+        stop_line               = 0;
+        stop_line_per_thread    = 0;
+        stop_line_per_thread_m  = 0;
+    }
+
+
+    // insert table step_time
+    int step_time;
+    p->tools->find_argv_int( argc, argv, "step_time", & step_time );
+    if ( step_time <= 0 ) {
+        step_time = 1000;
+    }
+    TSDB_INFO( p, "[INSERT][PARAMETERS][step_time   =%d]", step_time );
+
+    // sql size
+    int sql_bytes;
+    const char * ps = NULL;
+    p->tools->find_argv( argc, argv, "sql_size", & ps, NULL );
+    char c;
+    if ( NULL == ps || '\0' == * ps || * ps <= 0 || ! isdigit( * ps ) ) {
+        ps = NULL;
+    } else {
+        size_t len = strlen( ps );
+        if ( len <= 1 ) {
+            TSDB_ERROR( p, "[INSERT][PARAMETERS][sql_size=%s]invalid sql_size", ps );
+            ps = NULL;
+            return EINVAL;
+        }
+        c = ps[ len - 1 ];
+    }
+    if ( NULL == ps ) {
+        sql_bytes = 1024 * 1024;
+    } else {
+        sql_bytes = atoi( ps );
+        if ( 'b' == tolower(c) ) {
+            // do nothing
+        } else if ( 'k' == tolower(c) ) {
+            sql_bytes *= 1024;
+        } else if ( 'm' == tolower(c) ) {
+            sql_bytes *= (1024 * 1024);
+        } else {
+            TSDB_ERROR( p, "[INSERT][PARAMETERS][package_size=%s]invalid package_size", ps );
+            ps = NULL;
+            return EINVAL;
+        }
+    }
+    TSDB_INFO( p, "[INSERT][PARAMETERS][sql_size    =%d bytes]", sql_bytes );
+
+#if 0
+    // get file size
+    int64_t sz = p->tools->get_file_size( path.c_str() );
+    if ( unlikely( sz <= 0 ) ) {
+        TSDB_ERROR( p, "[INSERT][path=%s]get_file_size failed", path.c_str() );
+        return EINVAL;
+    }
+
+    TSDB_INFO( p, "[path=%s]Load the file content into memory", path.c_str() );
+    std::string data;
+    if ( sz > 0 ) {
+        try {
+            data.resize( (size_t)sz );
+        } catch ( ... ) {
+            TSDB_ERROR( p, "[INSERT][path=%s][size=%lld]bad_alloc", path.c_str(), (long long)sz );
+            return ENOMEM;
+        }
+        r = p->tools->load_file( path.c_str(), & data[0], & sz );
+        if ( unlikely( 0 != r ) ) {
+            TSDB_ERROR( p, "[INSERT][path=%s][size=%lld][r=%d]load_file failed", path.c_str(), (long long)sz, r );
+            return r;
+        }
+        data.resize( (size_t)sz );
+    }
+    if ( data.empty() ) {
+        TSDB_ERROR( p, "[INSERT][path=%s]file empty", path.c_str() );
+        return EINVAL;
+    }
+
+    // We want split lines by \n. first step, we need to calculate the line count.
+    std::vector< tsdb_str > lines;
+    int count = 0;
+    p->tools->to_const_array( data.c_str(), (int)data.size(), "\n", (int)sizeof("\n")-1, NULL, & count );
+    if ( count <= 0 ) {
+        TSDB_ERROR( p, "[INSERT][path=%s]file empty", path.c_str() );
+        return EINVAL;
+    }
+    // parpare the buffer cordinate the line count.
+    try {
+        lines.resize( count );
+    } catch ( ... ) {
+        TSDB_ERROR( p, "[INSERT][lines=%d]No memory to load file", count );
+        return ENOMEM;
+    }
+    // real split lines by \n
+    p->tools->to_const_array( data.c_str(), (int)data.size(), "\n", (int)sizeof("\n")-1, & lines[0], & count );
+    lines.resize( count );
+    if ( count > 0 && 0 == lines[ count - 1 ].len ) {
+        // delete last empty line
+        -- count;
+        lines.resize( count );
+    }
+    if ( count <= 1 ) {
+        TSDB_ERROR( p, "[INSERT][path=%s]file empty", path.c_str() );
+        return EINVAL;
+    }
+#endif
+
+    std::map < std::string, std::vector<std::string> > map_vt_table_head_data_path;
+    std::vector<struct table_lead_and_table_path_t> vt_table_lead_and_table_path_t;
+
+    // 如果路径不为空  则执行  
+    if (!path.empty()) {
+        // 解析表数据文件  
+        r = parse_table_data_conf_file(path.c_str(), map_vt_table_head_data_path);
+        if (0 != r) {
+            TSDB_ERROR(p, "[CREATE][path=%s] parse_table_data_conf_file failed", path.c_str());
+            return r;
+        }
+
+        // 将表数据信息转化vector格式 目的是为了便于将表数据发送到各个线程中  
+        r = convert_table_data_map_to_table_vector(map_vt_table_head_data_path, vt_table_lead_and_table_path_t);
+        if (0 != r) {
+            TSDB_ERROR(p, "[CREATE][path=%s] convert_table_data_map_to_table_vector failed", path.c_str());
+            return r;
+        }
+    }
+
+    // 各个表插入数据运行时状态  
+    std::vector<struct insert_table_runtime_info_t> vt_insert_table_runtime_info_t;
+    
+    vt_insert_table_runtime_info_t.resize(vt_table_lead_and_table_path_t.size());
+    // 初始化结构体内数据  
+    for (size_t i=0; i<vt_insert_table_runtime_info_t.size(); i++ )
+    {
+        vt_insert_table_runtime_info_t[i].is_file_open = false;
+        // vt_insert_table_runtime_info_t[i].fo;
+        vt_insert_table_runtime_info_t[i].line_no = -1;
+        vt_insert_table_runtime_info_t[i].is_end_of_file = false;
+        vt_insert_table_runtime_info_t[i].vt_table_fields_name.resize(0);
+        vt_insert_table_runtime_info_t[i].start_time = start_time;
+        
+    }
+
+    // input talbe config file path
+    std::string table_conf;
+    {
+        const char* _table_conf = NULL;
+        p->tools->find_argv(argc, argv, "table_conf", &_table_conf, NULL);
+        if (NULL == _table_conf || '\0' == *_table_conf) {
+            TSDB_ERROR(p, "[INSERT] not found table_conf");
+            return EINVAL;
+        }
+        table_conf = _table_conf;
+        p->tools->path_to_os(&table_conf[0]);
+    }
+    TSDB_INFO(p, "[INSERT][PARAMETERS][table_conf        =%s]", table_conf.c_str());
+
+    // 解析表配置文件中的内容  
+    std::map<std::string, struct test_table_file_info_t> map_test_table_file_info_t;
+    r = parse_table_conf_file(table_conf.c_str(), map_test_table_file_info_t);
+    if (0 != r) {
+        TSDB_INFO(p, "[CREATE][table_conf=%s] parse_table_conf_file failed", table_conf.c_str());
+        return r;
+    }
+
+    std::vector<struct table_lead_and_table_name_t> vt_table_lead_and_table_name_t;
+
+    // 将表配置信息转化vector格式 目的是为了便于将表配置信息发送到各个线程中  
+    r = convert_table_conf_map_to_table_vector(map_test_table_file_info_t, vt_table_lead_and_table_name_t);
+    if (0 != r) {
+        TSDB_INFO(p, "[CREATE][path=%s] convert_table_conf_map_to_table_vector failed", path.c_str());
+        return r;
+    }
+
+
+    std::string db_name;
+    std::string sql;
+
+
+    // get Database name
+
+    {
+        // first line contains Database name:
+        // -db DB_TEST_WRITE
+        const char* db = NULL;
+        p->tools->find_argv(argc, argv, "db", &db, NULL);
+        if (NULL == db || '\0' == *db) {
+            db = "DB_TEST_WRITE";
+        }
+        TSDB_INFO(p, "[INSERT][PARAMETERS][db      =%s]", db);
+
+
+        db_name = db;
+        if (db_name.empty()) {
+            TSDB_ERROR(p, "[INSERT]db_name empty");
+            return EINVAL;
+        }
+       
+    }
+
+    // prepare INSERT into TABLE threads
+
+    std::vector< thread_param_insert_table_general_t >   threads;
+    threads.resize( thread_count );
+    for ( size_t i = 0; i < threads.size(); ++ i ) {
+        thread_param_insert_table_general_t & item   = threads[ i ];
+        item.engine             = engine;
+        item.conn           = engine2->create_conn();
+        if (NULL == item.conn) {
+            TSDB_ERROR(p, "[INSERT][server=%s]create_conn failed", server);
+            return EFAULT;
+        }
+        item.thread_id          = (uint32_t)i;
+        item.thread_count       = (uint32_t)threads.size();
+        item.sql_bytes          = (uint32_t)sql_bytes;
+        item.start_time         = start_time;
+        item.stop_time          = stop_time;
+        item.stop_local_time    = stop_local_time;
+        item.stop_line          = stop_line_per_thread;
+        if ( i == threads.size() - 1 ) {
+            item.stop_line     += stop_line_per_thread_m;
+        }
+        item.step_time          = (uint32_t)step_time;
+        item.insert_line_count  = 0;
+        item.insert_need        = 0;
+        item.insert_from        = 0;
+        item.r                  = 0;
+        item.lines              = NULL;
+        item.db                 = db_name.c_str();
+        item.thread             = 0;
+        item.exited             = false;
+        item.map_test_table_file_info_t = &map_test_table_file_info_t;
+        item.map_vt_table_head_data_path = &map_vt_table_head_data_path;
+        //item.vt_table_lead_and_table_path_t = &vt_table_lead_and_table_path_t;
+        item.vt_table_lead_and_table_name_t = &vt_table_lead_and_table_name_t;
+        item.vt_insert_table_runtime_info_t = &vt_insert_table_runtime_info_t;
+    }
+
+    // start INSERT into TABLE threads
+
+    for ( size_t i = 0; i < threads.size(); ++ i ) {
+        thread_param_insert_table_general_t & item = threads[ i ];
+        item.exited = false;
+        if ( unlikely( ! p->tools->thread_start( & item.thread, insert_table_general_thread, & item, 0 ) ) ) {
+            TSDB_ERROR( p, "[INSERT]thread_start failed" );
+            item.exited = true;
+            return EFAULT;
+        }
+    }
+
+    // waitting for INSERT into TABLE threads stop
+
+    unsigned long start         = p->tools->get_tick_count();
+    unsigned long last_show     = start;
+    uint64_t      last_count    = 0;
+
+    while ( true ) {
+
+        // sleep 100 ms
+        p->tools->sleep_ms( 100 );
+
+        unsigned long stop = p->tools->get_tick_count();
+        unsigned long span = stop - last_show;
+        if ( unlikely( span >= 1000 ) ) {
+
+            // If last show insert info time pass 1 s, then show insert info now.
+
+            // get current time as string, this for show to human.
+            char s[ 64 ];
+            int  sl = (int)sizeof(s);
+            p->tools->datetime_to_str( p->tools->datetime_now(), s, & sl );
+
+            // collect thread exit status, and insert into table count.
+            uint32_t exit_count     = 0;
+            uint64_t count          = 0;
+            uint64_t curr_time_b    = 0;
+            uint64_t curr_time_e    = 0;
+            int      n;
+            char     curr_time_bs[ 64 ];
+            char     curr_time_es[ 64 ];
+            for ( size_t i = 0; i < threads.size(); ++ i ) {
+                thread_param_insert_table_general_t & item = threads[ i ];
+                count += item.insert_line_count;
+                if ( item.exited ) {
+                    ++ exit_count;
+                }
+                if ( 0 == curr_time_b || 0 == curr_time_e ) {
+                    curr_time_b = curr_time_e = item.start_time;
+                } else {
+                    if ( item.start_time < curr_time_b ) {
+                        curr_time_b = item.start_time;
+                    }
+                    if ( item.start_time > curr_time_e ) {
+                        curr_time_e = item.start_time;
+                    }
+                }
+            }
+
+            uint32_t speed = (uint32_t)(count - last_count);
+
+            if ( curr_time_b > 0 ) {
+                n = (int)sizeof(curr_time_bs);
+                p->tools->datetime_to_str( curr_time_b, curr_time_bs, & n );
+            } else {
+                curr_time_bs[ 0 ] = '\0';
+            }
+            if ( curr_time_e > 0 ) {
+                n = (int)sizeof(curr_time_es);
+                p->tools->datetime_to_str( curr_time_e, curr_time_es, & n );
+            } else {
+                curr_time_es[ 0 ] = '\0';
+            }
+
+            if ( 0 == strcmp( curr_time_bs, curr_time_es ) ) {
+                fprintf( stderr, "\r%s [INSERT_TABLE][%lld / %d][speed=%d/s][time=%s]...",
+                        s, (long long)count, (int)(/*lines.size()*/ 1- 1), speed,
+                        curr_time_bs
+                );
+            } else {
+                fprintf( stderr, "\r%s [INSERT_TABLE][%lld / %d][speed=%d/s][time=%s -> %s]...",
+                        s, (long long)count, (int)(/*lines.size()*/1 - 1), speed,
+                        curr_time_bs, curr_time_es
+                );
+            }
+
+            // member this time
+            last_show = stop;
+            last_count = count;
+
+            if ( exit_count == (uint32_t)threads.size() ) {
+                // If all thread exited, then exit the loop now.
+                break;
+            }
+        }
+    }
+    fprintf( stderr, "\n" );
+    
+    uint64_t line_count = 0;
+    for ( size_t i = 0; i < threads.size(); ++ i ) {
+        thread_param_insert_table_general_t & item = threads[ i ];
+        line_count += item.insert_line_count;
+    }
+
+    unsigned long stop = p->tools->get_tick_count();
+    unsigned long span = stop - start;
+    TSDB_INFO( p, "[INSERT_TABLE][table_count=%d][line=%lld][use=%d ms]",
+                  (int)(/*lines.size()*/ 1 - 1), (long long)line_count, span);
+
+    // Close Thread
+    for ( size_t i = 0; i < threads.size(); ++ i ) {
+        thread_param_insert_table_general_t & item = threads[ i ];
+        p->tools->thread_join( & item.thread );
+
+        if ( item.conn ) {
+            item.conn->kill_me();
+            item.conn = NULL;
+        }
+    }
+
+    return r;
+}
+
+} // namespace wide
+} // namespace test
+} // namespace rtdb
