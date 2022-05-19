@@ -1,6 +1,8 @@
+<img src="https://rtdb-doc.oss-cn-beijing.aliyuncs.com/quick_learn/logo02_small.png?versionId=CAEQHhiBgMDkpaHvhhgiIDJiMzE0MDA3NmNhNTQ1YzY4MGJkMmI4ZmQ4YmU1YzYz" height="280"  />
+
 RTDB是一款高性能、高可用、跨平台、分布式、自主可控、支持SQL，具备高效的数据调度能力和分析能力的时序数据库。为满足时序场景第一需求：大数据高并发实时入库与毫秒级查询响应。不走技术路线依赖，不依赖任何开源库，重新定义底层存储架构与算法，深耕实现每行代码。
 
-该文档主要介绍怎么使用RTDB完成数据的高效导入与查询。同时为了让大家对RTDB更深入客观的了解，该项目也适配了TDEngine与Timescale的数据导入与查询操作。
+主要介绍怎么使用RTDB完成数据的高效导入与查询。同时为了让大家对RTDB更深入客观的了解，该项目也适配了TDEngine与Timescale的数据导入与查询操作。
 请分别参阅
 TDEngine ：https://github.com/taosdata/TDengine
 Timescale: https://github.com/timescale/timescaledb
@@ -8,7 +10,6 @@ Timescale: https://github.com/timescale/timescaledb
 
 # Features
 - **支持的数据类型**
-
 下表所示RTDB支持的数据类型。其中，“**数据类型及别名**”列中所示的内容都可以在SQL语句中使用。我们在SQL99标准以外，支持更多的数据类型别名，是为了与更广泛的与其它数据库兼容。
    
    支持的数据类型如下表：
@@ -35,7 +36,6 @@ Timescale: https://github.com/timescale/timescaledb
   [注2] 在测试版本中，varchar 采用定长字符串 char(?) 技术。
   
 - **支持表结构模板预先申明，根据表结构导入数据**
-
 该项目是根据表结构的模板创建表，模板中定义了表的字段名称、字段类型以及字段是否支持空。系统保留字段名称“time”作为主键，如果表结构中没有申明“time”字段，系统根据记录记录导入时间自动生成时间戳作为主键。
 表结构模板格式如下：
 
@@ -57,16 +57,13 @@ gps_latitude float
 gps_vehicle_speed float
 ```
 - **支持文本数据与csv数据的导入**
-
 不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：空格“ ”、逗号“，”、顿号“、”。
 
 - **支持模拟数据的导入**
-
 如果在配置中没有指定需要导入的数据文件，系统会智能匹配表结构模板中的数据类型，随机生成数据，执行数据导入。
 
 ## Requirements
-
-主程序，在 Windows 下的可执行文件名是：rtdb_import.exe，在 Linux 下的可执行文件名是：rtdb_import
+主程序，在 Windows 下的可执行文件名是：wide_rtdb.exe，在 Linux 下的可执行文件名是：wide_rtdb
 
 在程序同目录下，包含数据库连接客户端的动态连接库文件。
 
@@ -92,18 +89,15 @@ TAOS 数据库客户端接口只能通过 -ltaos 编译选项连接，所以要�
 由于timescale是基于postgres的，所以如果要编译适配timescale，需要引入postgres的依赖。
 
 **编译器配置**
-
 windows，vs2010
 linux，gcc
 
 
 ## Build
 - **windows**
-
 执行wide_table.sln编译
 
 - **linux**
-
 cd \wide_table\rtdb
 执行 make
 
@@ -122,7 +116,7 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 
 generate test data:
 
-        rtdb_import -generate.data.general  -thread 2 -path ./general_table.conf -format txt  -start_time 2020-01-01 -step_time 1000 -stop_time 2020-02-01 -line_count 100
+        wide_rtdb -generate.data.general  -thread 2 -path ./general_table.conf -format txt  -start_time 2020-01-01 -step_time 1000 -stop_time 2020-02-01 -line_count 100
                 thread:       how many threads used to create data, default thread count same with CPU core count
                 path:         file path generate by 'general_table.conf' file.
                 format:       only support 'txt', default value is 'txt'
@@ -142,9 +136,9 @@ generate test data:
 
 create table:
 
-        rtdb_import -create.table.general -engine rtdb -server 127.0.0.1:9000 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
-        rtdb_import -create.table.general -engine taos -server 192.168.1.43:6030 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
-        rtdb_import -create.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
+        wide_rtdb -create.table.general -engine rtdb -server 127.0.0.1:9000 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
+        wide_rtdb -create.table.general -engine taos -server 192.168.1.43:6030 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
+        wide_rtdb -create.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
                 engine:       rtdb      RTDB (http://www.rtdb.com).
                               taos      TAOS (http://www.taosdata.com).
                               timescaledb      TIMESCALEDB (https://www.timescale.com/).
@@ -159,9 +153,9 @@ create table:
 
 insert into table:
 
-        rtdb_import -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m  -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
-        rtdb_import -insert.table.general -engine taos -server 192.168.1.43:6030 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
-        rtdb_import -insert.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
+        wide_rtdb -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m  -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
+        wide_rtdb -insert.table.general -engine taos -server 192.168.1.43:6030 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
+        wide_rtdb -insert.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
                 engine:       rtdb      RTDB (http://www.rtdb.com).
                               taos      TAOS (http://www.taosdata.com).
                               timescaledb      TIMESCALEDB (https://www.timescale.com/).
@@ -189,9 +183,9 @@ insert into table:
 
 find from table:
 
-        rtdb_import -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
-        rtdb_import -find.table.general -engine taos -server 127.0.0.1:6030 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
-        rtdb_import -find.table.general -engine timescaledb -server 127.0.0.1:5432 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
+        wide_rtdb -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
+        wide_rtdb -find.table.general -engine taos -server 127.0.0.1:6030 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
+        wide_rtdb -find.table.general -engine timescaledb -server 127.0.0.1:5432 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
                 engine:       rtdb      RTDB (http://www.rtdb.com).
                               taos      TAOS (http://www.taosdata.com).
                               timescaledb      TIMESCALEDB (https://www.timescale.com/).
@@ -252,8 +246,14 @@ example: general_std.txt.data:
 ## Usage
 1、用如下命令生成 60 万张表的信息。
 
-> rtdb_import.exe -generate.table -dst ./generate_table.txt -format txt -db DB_wide -table_lead TABLE_ -bool 200000 -int 200000 -float 200000
+> wide_rtdb.exe -generate.table -dst ./generate_table.txt -format txt -db DB_wide -table_lead TABLE_ -bool 200000 -int 200000 -float 200000
 {.is-info}
+
+
+
+
+
+
 
 
 
