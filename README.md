@@ -145,11 +145,9 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 通过以下命令创建5千张表
 #### windows平台（create_table_general.bat）
 > call "rtdb_import.exe" -create.table.general -engine rtdb -server 192.168.1.43:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path data\general_table.conf -format txt  -db DB_TEST_WRITE
-{.is-info}
 
 #### linux平台（create_table_general.sh）
 > ./rtdb_import -create.table.general -engine rtdb -server 192.168.1.43:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path data/general_table.conf -format txt  -db DB_TEST_WRITE
-{.is-info}
 
 ### 创建表参数解释
 
@@ -169,7 +167,6 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 ### general_table.conf 格式说明
 
 > TABLE_			    [1, 5000] 	data/general_std.txt
-{.is-info}
 
   |   参数                 | 参数说明                                                     | 
   | ----                  |  -                                                          |  
@@ -184,11 +181,9 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 *注：如果命令中不指定path参数，也就是不指定数据源，系统会根据表结构中字段的数据类型，模拟生成数据。*
 #### windows平台（import_data.bat）
 > call "rtdb_import.exe" -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  /start_time '2020-01-01' -step_time 1000  -sql_size 128k -path data\general_data.conf -format csv -db DB_TEST_WRITE -table_conf data\general_table.conf
-{.is-info}
 
 #### linux平台（import_data.sh）
 > ./rtdb_import -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 40 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000  -stop_time 1h -sql_size 128k -path data/general_data.conf -format csv  -db DB_TEST_WRITE -table_conf data/general_table.conf
-{.is-info}
 
 ### 导入数据参数解释
 
@@ -212,7 +207,6 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 ### general_data.conf  导入数据的配置说明
 
 > TABLE_	data/general_std.txt.data
-{.is-info}
 
   |   参数                 | 参数说明                                                     | 
   | ----                  |  -                                                          |  
@@ -224,7 +218,6 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 
 > FIELD_0	FIELD_1	FIELD_2	FIELD_3	FIELD_4	FIELD_5	FIELD_6	FIELD_7	FIELD_8	FIELD_9	FIELD_10	FIELD_11	FIELD_12	FIELD_13
 > false	0	0	0.23	0.23	'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx32'	'2020-01-01 00:00:00.000'	false	0	0	0.23	0.23	'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx64'	'2020-01-01 00:00:00.000'
-{.is-info}
 
 
 ### 3、查询数据
@@ -233,11 +226,9 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 
 #### windows平台（find_table_general.bat）
 > call "rtdb_import.exe" -find.table.general -engine rtdb -server 192.168.1.43:1234 -thread 80 -timeout.recv infinite /start_time '2020-01-01' -step_time 1000 -stop_time 5h -db DB_TEST_WRITE -path data/general_table.conf -format txt
-{.is-info}
 
 #### linux平台（find_table_general.sh）
 > ./rtdb_import -find.table.general -engine rtdb -server 192.168.1.43:1234 -thread 5 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 5h -db DB_TEST_WRITE -path data/general_table.conf -format txt
-{.is-info}
 
 ### 查询数据参数解释
 
