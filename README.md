@@ -98,7 +98,7 @@ gps_vehicle_speed float
   |             | Linux 64位   | libtsdb.so            | RTDB数据库的64位Linux客户端接口库   |
   |  TDEngine   | Windows32位  | taos.dll              | TDEngine数据库的32位Windows客户端接口库 |
   |             | Windows64位  | taos.dll              | TDEngine数据库的64位Windows客户端接口库 |
-  |             | Linux 64位   | libtsdb.so            | TDEngine数据库的64位Linux客户端接口库   |
+  |             | Linux 64位   | libtaos.so.1          | TDEngine数据库的64位Linux客户端接口库   |
   |  TimeScale  | Windows64位  | libcrypto-1_1-x64.dll |                                     |
   |             |              | libiconv-2.dll        |                                     |
   |             |              | libintl-9.dll         |                                     |
