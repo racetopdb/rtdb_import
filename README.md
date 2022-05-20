@@ -114,20 +114,21 @@ TAOS 数据库客户端接口只能通过 -ltaos 编译选项连接，所以要�
 由于timescale是基于postgres的，所以如果要编译适配timescale，需要引入postgres的依赖。
 
 **编译器配置**
-windows，vs2010
-linux，gcc
 
+> windows vs2010
+
+> linux，gcc
 
 ## Build
 - **windows**
 
-执行rtdb_import.sln完成编译
+> 执行rtdb_import.sln完成编译
 
 - **linux**
 
-cd make
+> cd make
 
-执行 sh build.sh
+> 执行 sh build.sh
 
 ## Installation
 
