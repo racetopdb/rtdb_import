@@ -8,8 +8,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -273,19 +272,19 @@ static int build_create_table_sql(
 
     switch (engine)
     {
-    case rtdb::test::wide::DB_RTDB:
+    case rtdb::wide::DB_RTDB:
     {
         return build_create_table_sql_for_rtdb(table_name, vt_test_tb_field_info_t, sql);
     }
-    case rtdb::test::wide::DB_TAOS:
+    case rtdb::wide::DB_TAOS:
     {
         return build_create_table_sql_for_taos(table_name, vt_test_tb_field_info_t, sql);
     }
-    case rtdb::test::wide::DB_TIMESCALEDB:
+    case rtdb::wide::DB_TIMESCALEDB:
     {
         return build_create_table_sql_for_timescaledb(table_name, vt_test_tb_field_info_t, sql);
     }
-    case rtdb::test::wide::DB_UNKNOWN:
+    case rtdb::wide::DB_UNKNOWN:
     default:
 
         TSDB_ERROR( p, "[r=%d][db_type:%d] invalid db_type", (int)engine);
@@ -660,5 +659,5 @@ int create_table_general( int argc, char ** argv )
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

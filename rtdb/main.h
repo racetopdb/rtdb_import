@@ -6,8 +6,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -25,7 +24,7 @@ int create_table_general( int argc, char ** argv );
 int find_table_general( int argc, char ** argv );
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb
 
 #endif

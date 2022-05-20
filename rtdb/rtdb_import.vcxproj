@@ -151,7 +151,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>RTDB\include;TAOS\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>RTDB\include;TAOS\include;TIMESCALEDB\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
     </ClCompile>
@@ -161,8 +161,9 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y $(ProjectDir)RTDB\win32\tsdbd.dll  $(OutDir)\tsdb.dll
-copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\</Command>
+      <Command>mkdir $(OutDir)\data
+copy /y $(SolutionDir)cmd\data $(OutDir)\data\
+copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -182,18 +183,9 @@ copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\</Command>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y $(ProjectDir)RTDB\x64\tsdbd.dll  $(OutDir)\tsdb.dll
-copy /y $(ProjectDir)TAOS\x64\taos.dll  $(OutDir)\
-copy /y $(ProjectDir)TIMESCALEDB\x64\libpq.dll   $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libcrypto-1_1-x64.dll  $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libiconv-2.dll  $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libintl-9.dll   $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libssl-1_1-x64.dll $(OutDir)\
-</Command>
+      <Command>mkdir $(OutDir)\data
+copy /y $(SolutionDir)cmd\data $(OutDir)\data\
+copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -205,7 +197,7 @@ copy /y $(ProjectDir)TIMESCALEDB\x64\libssl-1_1-x64.dll $(OutDir)\
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>RTDB\include;TAOS\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>RTDB\include;TAOS\include;TIMESCALEDB\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
     </ClCompile>
@@ -217,8 +209,9 @@ copy /y $(ProjectDir)TIMESCALEDB\x64\libssl-1_1-x64.dll $(OutDir)\
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y $(ProjectDir)RTDB\win32\tsdb.dll  $(OutDir)\
-copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\</Command>
+      <Command>mkdir $(OutDir)\data
+copy /y $(SolutionDir)cmd\data $(OutDir)\data\
+copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -242,18 +235,9 @@ copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\</Command>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y $(ProjectDir)RTDB\x64\tsdb.dll  $(OutDir)\
-copy /y $(ProjectDir)TAOS\x64\taos.dll  $(OutDir)\
-copy /y $(ProjectDir)TIMESCALEDB\x64\libpq.dll   $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libcrypto-1_1-x64.dll  $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libiconv-2.dll  $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libintl-9.dll   $(OutDir)\
-
-copy /y $(ProjectDir)TIMESCALEDB\x64\libssl-1_1-x64.dll $(OutDir)\
-</Command>
+      <Command>mkdir $(OutDir)\data
+copy /y $(SolutionDir)cmd\data $(OutDir)\data\
+copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

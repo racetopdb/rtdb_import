@@ -6,8 +6,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -44,7 +43,7 @@ private:
 };
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb
 
 #endif

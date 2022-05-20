@@ -18,8 +18,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -493,5 +492,5 @@ int generate_data_general( int argc, char ** argv )
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

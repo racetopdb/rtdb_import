@@ -12,8 +12,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -149,5 +148,5 @@ int wide_taos_conn_t::query_has_result( const char * sql, size_t sql_len, uint64
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

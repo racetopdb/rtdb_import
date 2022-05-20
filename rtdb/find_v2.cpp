@@ -9,8 +9,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -732,5 +731,5 @@ int find_table_v2( int argc, char ** argv )
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

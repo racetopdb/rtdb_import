@@ -5,8 +5,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -186,5 +185,5 @@ wide_conn_t * wide_rtdb_t::create_conn()
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

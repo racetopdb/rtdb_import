@@ -8,8 +8,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -503,5 +502,5 @@ int create_table_v2( int argc, char ** argv )
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

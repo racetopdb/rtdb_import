@@ -1,16 +1,16 @@
 #include "file_operation.h"
 
 
-using namespace rtdb::test::wide;
+using namespace rtdb::wide;
 
 
-rtdb::test::wide::file_operation::
+rtdb::wide::file_operation::
 file_operation() :
     m_stream(NULL), m_filename()
 {
 }
 
-rtdb::test::wide::file_operation::
+rtdb::wide::file_operation::
 ~file_operation()
 {
     close();
@@ -21,7 +21,7 @@ rtdb::test::wide::file_operation::
  * @param[in]  const char *filename    文件名  
  * @return    0 成功 其他 失败  
  */
-int rtdb::test::wide::file_operation::open_by_read(const char* filename)
+int rtdb::wide::file_operation::open_by_read(const char* filename)
 {
     FILE* stream = fopen(filename, "rb");
     if (unlikely(NULL == stream)) {
@@ -39,7 +39,7 @@ int rtdb::test::wide::file_operation::open_by_read(const char* filename)
  * @param[in]  const char *filename    文件名  
  * @return    0 成功 其他 失败  
  */
-int rtdb::test::wide::file_operation::open_by_write(const char* filename)
+int rtdb::wide::file_operation::open_by_write(const char* filename)
 {
     FILE* stream = fopen(filename, "wb");
     if (unlikely(NULL == stream)) {
@@ -58,7 +58,7 @@ int rtdb::test::wide::file_operation::open_by_write(const char* filename)
  * @param[in]       unsigned int buffer_bytes    buffer 缓存大小  
  * @return  >=0 成功 -1 失败  
  */
-int rtdb::test::wide::file_operation::read_one_line(char buffer[], unsigned int buffer_bytes)
+int rtdb::wide::file_operation::read_one_line(char buffer[], unsigned int buffer_bytes)
 {
     char* pbuffer = NULL;
 
@@ -88,7 +88,7 @@ int rtdb::test::wide::file_operation::read_one_line(char buffer[], unsigned int 
  * @param[in]  bool is_flush                     是否强制刷新缓存  
  * @return  >=0 成功 -1 失败  
  */
-int rtdb::test::wide::file_operation::write_one_line(
+int rtdb::wide::file_operation::write_one_line(
     const char buffer[], unsigned int buffer_bytes, bool is_flush)
 {
     size_t  size = fwrite((const void*)buffer, 1, (size_t)buffer_bytes, m_stream);
@@ -108,7 +108,7 @@ int rtdb::test::wide::file_operation::write_one_line(
  * @brief  关闭  
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::file_operation::close()
+int rtdb::wide::file_operation::close()
 {
     if (likely(NULL != m_stream)) {
         fclose(m_stream);

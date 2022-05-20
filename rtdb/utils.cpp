@@ -4,11 +4,7 @@
 #include <sstream>
 
 
-using namespace rtdb::test::wide;
-
-
-
-
+using namespace rtdb::wide;
 
 
 /**
@@ -27,8 +23,16 @@ static int load_file_core(const char* file_path, std::string& data, std::vector<
 
     tsdb_v3_t* p = rtdb_tls();
     assert(p);
-
-    // 先探测文件长度  
+//     char path[ 256 ] = {0};
+//     char dir[ 256 ] = {0};
+//     p->tools->get_cur_dir(dir,(int)sizeof(dir),FALSE);
+//     if ( '/' == dir[0] || '\\' == dir[0] ) {
+//         sprintf_s(path,sizeof(path),"%s%s",dir,file_path);
+//     }else{
+//         sprintf_s(path,sizeof(path),"%s\\%s",dir,file_path);
+//     }
+//     p->tools->path_to_os( path );
+    // 先探测文件长度       
     r = p->tools->load_file(file_path, NULL, &data_len);
     if (EMSGSIZE != r) {
          TSDB_ERROR( p, "[r=%d][file:%s] load file failed", r, file_path);
@@ -722,7 +726,7 @@ static int do_parse_field_list_file_step_2(
  * @param[out] std::vector<struct test_tb_field_info_t> &vt_test_tb_field_info_t     字段列表数组  
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::parse_field_list_file(
+int rtdb::wide::parse_field_list_file(
     const char* field_list_file,
     std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t)
 {
@@ -1065,7 +1069,7 @@ static int do_parse_table_conf_file_step_2(
 
         std::vector<struct test_tb_field_info_t> vt_test_tb_field_info_t;
         // 将此文件路径解析  
-        r = rtdb::test::wide::parse_field_list_file(test_table_file_info.field_list_file.c_str(),
+        r = rtdb::wide::parse_field_list_file(test_table_file_info.field_list_file.c_str(),
             test_table_file_info.vt_test_tb_field_info_t);
         if (0 != r) {
             TSDB_ERROR(p, "[r=%d][file:%s] parse_field_list_file failed", r, test_table_file_info.field_list_file.c_str());
@@ -1096,7 +1100,7 @@ static int do_parse_table_conf_file_step_2(
  *             key : 表名前缀 value : struct test_table_file_info_t
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::parse_table_conf_file(
+int rtdb::wide::parse_table_conf_file(
     const char* table_conf_file,
     std::map<std::string, struct test_table_file_info_t>& map_test_table_file_info_t)
 {
@@ -1336,7 +1340,7 @@ static int do_parse_table_data_conf_file_step_2(
  * @param[in]  std::vector<struct table_lead_and_table_name_t> &vt_table_lead_and_table_name_t  表名信息vector形式  
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::convert_table_conf_map_to_table_vector(
+int rtdb::wide::convert_table_conf_map_to_table_vector(
     const std::map<std::string, struct test_table_file_info_t>& map_test_table_file_info_t,
     std::vector<struct table_lead_and_table_name_t>& vt_table_lead_and_table_name_t)
 {
@@ -1362,7 +1366,7 @@ int rtdb::test::wide::convert_table_conf_map_to_table_vector(
         const std::string &table_lead = iter->first;
         const struct test_table_file_info_t &ttfi = iter->second;
 
-        struct rtdb::test::wide::table_lead_and_table_name_t tlatn;
+        struct rtdb::wide::table_lead_and_table_name_t tlatn;
 
         try
         {
@@ -1398,7 +1402,7 @@ int rtdb::test::wide::convert_table_conf_map_to_table_vector(
  *             注意  test_table_file_info_t * 指向输入的map 的指针 后续不用考虑释放问题  
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::convert_table_conf_map_to_table_vector_ex(
+int rtdb::wide::convert_table_conf_map_to_table_vector_ex(
     const std::map<std::string, struct test_table_file_info_t>& map_test_table_file_info_t,
     std::vector<struct test_table_file_info_t*>& vt_test_table_file_info_t)
 {
@@ -1444,7 +1448,7 @@ int rtdb::test::wide::convert_table_conf_map_to_table_vector_ex(
  *             value : 数据文件列表  
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::parse_table_data_conf_file(
+int rtdb::wide::parse_table_data_conf_file(
     const char* table_data_conf_file,
     std::map < std::string, std::vector<std::string> >& map_vt_table_head_data_path)
 {
@@ -1492,7 +1496,7 @@ int rtdb::test::wide::parse_table_data_conf_file(
  * @param[out]  std::vector<struct table_lead_and_table_path_t> &vt_table_lead_and_table_name_t  表名信息vector形式  
  * @return  0 成功 其他 失败  
  */
-int rtdb::test::wide::convert_table_data_map_to_table_vector(
+int rtdb::wide::convert_table_data_map_to_table_vector(
     const std::map < std::string, std::vector<std::string> >& map_vt_table_head_data_path,
     std::vector<struct table_lead_and_table_path_t>& vt_table_lead_and_table_path_t)
 {
@@ -1518,7 +1522,7 @@ int rtdb::test::wide::convert_table_data_map_to_table_vector(
         const std::string& table_lead = iter->first;
         const std::vector<std::string> &vt_table_data_path = iter->second;
 
-        struct rtdb::test::wide::table_lead_and_table_path_t tlatp;
+        struct rtdb::wide::table_lead_and_table_path_t tlatp;
 
         try
         {
@@ -1553,7 +1557,7 @@ int rtdb::test::wide::convert_table_data_map_to_table_vector(
  * @param[out]  std::vector<BOOL>& vt_data_is_string    指示是否是字符串类型  
  * @return  0 成功 ENODATA 表示已经读到文件尾部了 其他情况失败  
  */
-int rtdb::test::wide::get_format_line_from_csv_file(
+int rtdb::wide::get_format_line_from_csv_file(
     file_operation& fo,
     const char* sep,
     std::vector<tsdb_str>& vt_data,
@@ -1622,7 +1626,7 @@ int rtdb::test::wide::get_format_line_from_csv_file(
  * @param[in]  float fstep                                 步长  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::init_data_for_int(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int def_value, float fstep)
+int rtdb::wide::init_data_for_int(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int def_value, float fstep)
 {
     fis.fstep = fstep;
     fis.data.value = def_value;
@@ -1637,7 +1641,7 @@ int rtdb::test::wide::init_data_for_int(struct field_increase_store_t& fis, enum
  * @param[in]  float fstep                                 步长  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::init_data_for_int64(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int64_t def_value, float fstep)
+int rtdb::wide::init_data_for_int64(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int64_t def_value, float fstep)
 {
     fis.fstep = fstep;
     fis.data.value64 = def_value;
@@ -1652,7 +1656,7 @@ int rtdb::test::wide::init_data_for_int64(struct field_increase_store_t& fis, en
  * @param[in]  float fstep                                 步长  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::init_data_for_float(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, float def_value, float fstep)
+int rtdb::wide::init_data_for_float(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, float def_value, float fstep)
 {
     fis.fstep = ((float)fstep/(float)1000);
     fis.data.fvalue = def_value;
@@ -1666,7 +1670,7 @@ int rtdb::test::wide::init_data_for_float(struct field_increase_store_t& fis, en
  * @param[out] int &value                                 返回值  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::generate_data_for_int(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int& value)
+int rtdb::wide::generate_data_for_int(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int& value)
 {
     value = fis.data.value;
     fis.data.value += (int)fis.fstep;
@@ -1681,7 +1685,7 @@ int rtdb::test::wide::generate_data_for_int(struct field_increase_store_t& fis, 
  * @param[out] int64_t &value                              返回值  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::generate_data_for_int64(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int64_t& value)
+int rtdb::wide::generate_data_for_int64(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, int64_t& value)
 {
     value = fis.data.value64;
     fis.data.value64 += (int64_t)fis.fstep;
@@ -1696,7 +1700,7 @@ int rtdb::test::wide::generate_data_for_int64(struct field_increase_store_t& fis
  * @param[out] float &value                                返回值  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::generate_data_for_float(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, float& value)
+int rtdb::wide::generate_data_for_float(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, float& value)
 {
     value = fis.data.fvalue;
     fis.data.fvalue += fis.fstep;
@@ -1710,7 +1714,7 @@ int rtdb::test::wide::generate_data_for_float(struct field_increase_store_t& fis
  * @param[out] std::string &value                          返回值  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::generate_data_for_string(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, std::string& value)
+int rtdb::wide::generate_data_for_string(struct field_increase_store_t& fis, enum tsdb_datatype_t datatype, std::string& value)
 {
     int r = 0;
     int value_int = 0;
@@ -1734,7 +1738,7 @@ int rtdb::test::wide::generate_data_for_string(struct field_increase_store_t& fi
  * @param[in]  float fstep                                 步长 各个字段设置相同  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::init_data_for_batch_by_default(
+int rtdb::wide::init_data_for_batch_by_default(
     std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
     std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t,
     uint64_t start_time,
@@ -1809,7 +1813,7 @@ int rtdb::test::wide::init_data_for_batch_by_default(
  * @param[out] std::string &line                                                               获取的一行数据  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::generate_field_for_one_line(
+int rtdb::wide::generate_field_for_one_line(
     std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t,
     int start_index,
     const char* sep,
@@ -1839,9 +1843,9 @@ int rtdb::test::wide::generate_field_for_one_line(
  * @param[out] std::string &line                                                               获取的一行数据  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::generate_data_for_one_line(std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
+int rtdb::wide::generate_data_for_one_line(std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
     std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t, int start_index, const char* sep, std::string &line);
-int rtdb::test::wide::generate_data_for_one_line(std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
+int rtdb::wide::generate_data_for_one_line(std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
     std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t, int start_index,  const char* sep, std::string& line)
 {
     int r = 0;
@@ -1977,7 +1981,7 @@ int rtdb::test::wide::generate_data_for_one_line(std::vector <struct field_incre
  * @param[in]  bool is_convert_time       是否转化时间(仅仅针对时间戳类型) 目前是针对taos对时间戳兼容不好做的处理  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::add_add_single_quotes_for_string_and_timestamp(
+int rtdb::wide::add_add_single_quotes_for_string_and_timestamp(
     std::string& value, tsdb_str& ts, enum tsdb_datatype_t datatype, int max_len, bool is_convert_time)
 {
     int r = 0;
@@ -2055,7 +2059,7 @@ int rtdb::test::wide::add_add_single_quotes_for_string_and_timestamp(
  * @param[in]  无  
  * @return   忽略返回值  
  */
-int rtdb::test::wide::print_current_path()
+int rtdb::wide::print_current_path()
 {
 
 #if defined( _WIN32 ) || defined(_WIN64)
@@ -2073,7 +2077,7 @@ int rtdb::test::wide::print_current_path()
  * @param[in]  enum tsdb_datatype_t  datatype     数据类型 仅仅为字符串和时间戳  
  * @return   true 全部都是数字 false 不全是数字  
  */
-bool rtdb::test::wide::is_digit_all(const std::string& str)
+bool rtdb::wide::is_digit_all(const std::string& str)
 {
     if (str.empty()) {
         return false;
@@ -2097,7 +2101,7 @@ bool rtdb::test::wide::is_digit_all(const std::string& str)
  * @param[in]  enum tsdb_datatype_t  datatype     数据类型 仅仅为字符串和时间戳  
  * @return   0 成功 其他 错误  
  */
-int rtdb::test::wide::deal_with_for_boolean(std::string& value, tsdb_str& ts, enum tsdb_datatype_t datatype)
+int rtdb::wide::deal_with_for_boolean(std::string& value, tsdb_str& ts, enum tsdb_datatype_t datatype)
 {
     int r = 0;
     tsdb_v3_t* p = rtdb_tls();

@@ -1,14 +1,13 @@
 #include "wide_timescaledb_conn.h"
 
-
+#if ENABLE_TIMESCALEDB
 
 #define TIMESCALEDB_USER   "postgres"
 #define TIMESCALEDB_PASSWD "postgres"
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -251,5 +250,6 @@ int wide_timescaledb_conn_t::query_has_result( const char * sql, size_t sql_len,
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb
+#endif // #if ENABLE_TIMESCALEDB

@@ -8,8 +8,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -750,10 +749,8 @@ bool is_digit_all(const std::string& str);
  * @return   0 成功 其他 错误  
  */
 int deal_with_for_boolean(std::string& value, tsdb_str& ts, enum tsdb_datatype_t datatype);
-
-
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb
 
 #endif

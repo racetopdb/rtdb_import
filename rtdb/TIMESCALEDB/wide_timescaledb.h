@@ -3,10 +3,11 @@
 
 #include "../wide_base.h"
 
+#if ENABLE_TIMESCALEDB
+
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -37,7 +38,9 @@ private:
 };
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb
+
+#endif // #if ENABLE_TIMESCALEDB
 
 #endif

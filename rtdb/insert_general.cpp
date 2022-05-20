@@ -21,8 +21,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -768,5 +767,5 @@ int insert_table_general( int argc, char ** argv )
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

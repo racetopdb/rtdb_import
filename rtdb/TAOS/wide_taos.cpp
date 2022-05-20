@@ -10,8 +10,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -111,5 +110,5 @@ wide_conn_t * wide_taos_t::create_conn()
 #endif // #if ENABLE_TDENGINE
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

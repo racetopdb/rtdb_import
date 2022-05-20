@@ -1,0 +1,3 @@
+# this file for general std table
+############################################################################################################################
+FIELD_0 bool, FIELD_1 int, FIELD_2 bigint, FIELD_3 float, FIELD_4 double, FIELD_5 varchar(32), FIELD_6 timestamp 

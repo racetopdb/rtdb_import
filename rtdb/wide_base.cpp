@@ -5,8 +5,7 @@
 
 namespace rtdb
 {
-namespace test
-{
+
 namespace wide
 {
 
@@ -41,16 +40,17 @@ db_type_t get_db_type( int argc, char ** argv )
 
     if ( 0 == stricmp( "rtdb", engine ) ) {
         return DB_RTDB;
-#if ENABLE_TDENGINE
     } else if ( 0 == stricmp( "taos", engine ) ) {
+#if ENABLE_TDENGINE
         return DB_TAOS;
 #endif // #if ENABLE_TDENGINE
-
-#if ENABLE_TIMESCALEDB
+        return DB_UNKNOWN;
     }
     else if (0 == stricmp("timescaledb", engine)) {
+#if ENABLE_TIMESCALEDB
         return DB_TIMESCALEDB;
 #endif // #if ENABLE_TIMESCALEDB
+         return DB_UNKNOWN;
     } else {
         TSDB_ERROR( p, "[engine=%s]invalid engine, only supported: rtdb | taos | timescaledb", engine );
         return DB_UNKNOWN;
@@ -79,7 +79,12 @@ wide_base_t * wide_base_t::instance( db_type_t type, int argc, char ** argv )
                 o = new wide_taos_t();
                 break;
             case DB_TIMESCALEDB:
+#if ENABLE_TIMESCALEDB
                 o = new wide_timescaledb_t();
+#else
+                TSDB_ERROR( p, "[type=%d]this system version not support for timescale", (int)type );
+                o = NULL;
+#endif
                 break;
             default:
                 TSDB_ERROR( p, "[type=%d]invalid type", (int)type );
@@ -103,5 +108,5 @@ wide_base_t * wide_base_t::instance( db_type_t type, int argc, char ** argv )
 }
 
 } // namespace wide
-} // namespace test
+
 } // namespace rtdb

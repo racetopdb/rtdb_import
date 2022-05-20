@@ -1,7 +1,7 @@
 #include "main.h"
 #include <sstream>
 
-using namespace rtdb::test::wide;
+using namespace rtdb::wide;
 
 static void usage( int argc, char ** argv )
 {

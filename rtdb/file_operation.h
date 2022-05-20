@@ -5,8 +5,6 @@
 
 namespace rtdb
 {
-namespace test
-{
 namespace wide
 {
 
@@ -66,7 +64,6 @@ namespace wide
 
 
 } // namespace wide
-} // namespace test
 } // namespace rtdb
 
 #endif
