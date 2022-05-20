@@ -220,7 +220,7 @@ int generate_data_general( int argc, char ** argv )
     tsdb_v3_t * p = rtdb_tls();
     assert( p );
 
-    TSDB_INFO( p, "[GENERATE]Generate Test Data" );
+    TSDB_INFO( p, "[GENERATE]Generate Import Data" );
 
     // The 'tools' structure contains many functions that we prepared for you.
     // you will see a lot of code call these functions via the 'tools'.

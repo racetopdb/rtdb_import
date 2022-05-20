@@ -205,6 +205,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="makefile" />
-    <None Include="..\readme.txt" />
+    <None Include="..\README.md" />
   </ItemGroup>
 </Project>

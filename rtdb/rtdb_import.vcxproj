@@ -76,7 +76,7 @@
     <ClInclude Include="wide_base.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\readme.txt" />
+    <None Include="..\README.md" />
     <None Include="makefile" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -163,7 +163,9 @@
     <PostBuildEvent>
       <Command>mkdir $(OutDir)\data
 copy /y $(SolutionDir)cmd\data $(OutDir)\data\
-copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
+copy /y $(SolutionDir)cmd\windows $(OutDir)\
+copy /y $(ProjectDir)RTDB\win32\tsdbd.dll  $(OutDir)\tsdb.dll
+copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\taos.dll</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -185,7 +187,10 @@ copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     <PostBuildEvent>
       <Command>mkdir $(OutDir)\data
 copy /y $(SolutionDir)cmd\data $(OutDir)\data\
-copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
+copy /y $(SolutionDir)cmd\windows $(OutDir)\
+copy /y $(ProjectDir)RTDB\x64\tsdbd.dll  $(OutDir)\tsdb.dll
+copy /y $(ProjectDir)TAOS\x64\taos.dll  $(OutDir)\taos.dll
+copy /y $(ProjectDir)\TIMESCALEDB\x64\*  $(OutDir)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -211,7 +216,9 @@ copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     <PostBuildEvent>
       <Command>mkdir $(OutDir)\data
 copy /y $(SolutionDir)cmd\data $(OutDir)\data\
-copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
+copy /y $(SolutionDir)cmd\windows $(OutDir)\
+copy /y $(ProjectDir)RTDB\win32\tsdb.dll  $(OutDir)\tsdb.dll
+copy /y $(ProjectDir)TAOS\win32\taos.dll  $(OutDir)\taos.dll</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -237,7 +244,10 @@ copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
     <PostBuildEvent>
       <Command>mkdir $(OutDir)\data
 copy /y $(SolutionDir)cmd\data $(OutDir)\data\
-copy /y $(SolutionDir)cmd\windows $(OutDir)\</Command>
+copy /y $(SolutionDir)cmd\windows $(OutDir)\
+copy /y $(ProjectDir)RTDB\x64\tsdb.dll  $(OutDir)\tsdb.dll
+copy /y $(ProjectDir)TAOS\x64\taos.dll  $(OutDir)\taos.dll
+copy /y $(ProjectDir)\TIMESCALEDB\x64\*  $(OutDir)\</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

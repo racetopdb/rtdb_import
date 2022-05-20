@@ -1,12 +1,11 @@
-<a href="https://www.rtdb.com" target="_blank">
+<a href="https://www.rtdb.com" target = "_blank">
     <img border="0" src="https://rtdb-doc.oss-cn-beijing.aliyuncs.com/quick_learn/log_rtdb.png?versionId=CAEQHhiBgIDUvLPvhhgiIGFjMWIyNTU2N2RhNTRiODk5N2FmMjNlZDNiZmYzYTMz" height="100"/>
 </a>
 
-
 RTDB是一款高性能、高可用、跨平台、分布式、自主可控、支持SQL，具备高效的数据调度能力和分析能力的时序数据库。为满足时序场景第一需求：大数据高并发实时入库与毫秒级查询响应。不走技术路线依赖，不依赖任何开源库，重新定义底层存储架构与算法，深耕实现每行代码。
 
-主要介绍怎么使用RTDB完成数据的高效导入与查询。同时为了让大家对RTDB更深入客观的了解，该项目也适配了TDEngine与Timescale的数据导入与查询操作。
-请分别参阅
+使用RTDB_IMPORT做为数据导入工具既可以往RTDB时序数据存储引擎完成时序数据的高效导入与查询，同时为了让大家对RTDB有更深入客观的了解，该项目也适配了TDEngine与Timescale的数据导入与查询操作。
+关于TDEngine与Timescale请分别参阅：
 TDEngine ：https://github.com/taosdata/TDengine
 Timescale: https://github.com/timescale/timescaledb
 
@@ -66,7 +65,7 @@ gps_vehicle_speed float
 如果在配置中没有指定需要导入的数据文件，系统会智能匹配表结构模板中的数据类型，随机生成数据，执行数据导入。
 
 ## Requirements
-主程序，在 Windows 下的可执行文件名是：wide_rtdb.exe，在 Linux 下的可执行文件名是：wide_rtdb
+主程序，在 Windows 下的可执行文件名是：rtdb_import.exe，在 Linux 下的可执行文件名是：rtdb_import
 
 在程序同目录下，包含数据库连接客户端的动态连接库文件。
 
@@ -84,6 +83,7 @@ gps_vehicle_speed float
   |             |              | libpq.dll             |                                     |
   |             |              | libpq.lib             |                                     |
   |             |              | libssl-1_1-x64.dll    |                                     |
+  |             |              | libwinpthread-1.dll   |                                     |
   |             | Linux 64位   | libpq.so              |                                     |
 
 
@@ -101,8 +101,8 @@ linux，gcc
 执行wide_table.sln编译
 
 - **linux**
-cd \wide_table\rtdb
-执行 make
+cd make
+执行 sh build.sh
 
 ## Installation
 
@@ -114,154 +114,126 @@ TDengine数据库服务安装请参考：(https://github.com/taosdata/TDengine)
 
 Timescale数据库服务安装请参考：(https://github.com/timescale/timescaledb)
 
-## Configuration
-```shell
-
-generate test data:
-
-        wide_rtdb -generate.data.general  -thread 2 -path ./general_table.conf -format txt  -start_time 2020-01-01 -step_time 1000 -stop_time 2020-02-01 -line_count 100
-                thread:       how many threads used to create data, default thread count same with CPU core count
-                path:         file path generate by 'general_table.conf' file.
-                format:       only support 'txt', default value is 'txt'
-                start_time:   start time.
-                step_time:    after writing data to all tables once, the timestamp adjusted to increment a fixed interval. This value is the fixed interval.
-                stop_time:    stop time. 
-                              YYYY-MM-DD               stop date string.
-                              YYYY-MM-DD HH:mm:SS.000  stop time string.
-                              2s                       stop time after n seconds.
-                              2m                       stop time after n minutes.
-                              2h                       stop time after n hours.
-                              2d                       stop time after n days.
-                              2w                       stop time after n weeks.
-                line_count:   need create lines one tables. 
-                              line_count and stop_time cannot be 0 at the same time..
-                              line_count priority is greater than stop_time .
-
-create table:
-
-        wide_rtdb -create.table.general -engine rtdb -server 127.0.0.1:9000 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
-        wide_rtdb -create.table.general -engine taos -server 192.168.1.43:6030 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
-        wide_rtdb -create.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE
-                engine:       rtdb      RTDB (http://www.rtdb.com).
-                              taos      TAOS (http://www.taosdata.com).
-                              timescaledb      TIMESCALEDB (https://www.timescale.com/).
-                server:       server address, format is 'ip:port'.
-                thread:       how many threads used to create table, default thread count same with CPU core count
-                timeout.conn: socket connect timeout by ms. '3000' by default.
-                timeout.send: socket connect timeout by ms. 'infinite' by default.
-                timeout.recv: socket connect timeout by ms. '3000' by default.
-                path:         file path generate by 'general_table.conf' file.
-                format:       only support 'txt', default value is 'txt'
-                db:           which database will be createdd. default value is 'DB_TEST_WRITE'
-
-insert into table:
-
-        wide_rtdb -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m  -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
-        wide_rtdb -insert.table.general -engine taos -server 192.168.1.43:6030 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
-        wide_rtdb -insert.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf
-                engine:       rtdb      RTDB (http://www.rtdb.com).
-                              taos      TAOS (http://www.taosdata.com).
-                              timescaledb      TIMESCALEDB (https://www.timescale.com/).
-                server:       server address, format is 'ip:port'.
-                thread:       how many threads used to write data, default thread count same with CPU core count
-                timeout.conn: socket connect timeout by ms. '3000' by default.
-                timeout.send: socket connect timeout by ms. 'infinite' by default.
-                timeout.recv: socket connect timeout by ms. '3000' by default.
-                start_time:   start time.
-                step_time:    after writing data to all tables once, the timestamp adjusted to increment a fixed interval. This value is the fixed interval.
-                              unit is ms, default value is 1000, that means 1 second.
-                stop_time:    stop time. path exists Automatically lapse
-                              YYYY-MM-DD               stop date string.
-                              YYYY-MM-DD HH:mm:SS.000  stop time string.
-                              2s                       stop time after n seconds.
-                              2m                       stop time after n minutes.
-                              2h                       stop time after n hours.
-                              2d                       stop time after n days.
-                              2w                       stop time after n weeks.
-                sql_size:     max bytes of an SQL statement, number followed by a charactor Suggest 128K
-                path:         file path generate by 'general_data.conf' file. if path not exist The mode is to generate data automatically!!!
-                format:       only support 'txt', default value is 'txt'
-                db:           which database will be createdd. default value is 'DB_TEST_WRITE'
-                table_conf:   file path generate by 'general_table.conf' file.
-
-find from table:
-
-        wide_rtdb -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
-        wide_rtdb -find.table.general -engine taos -server 127.0.0.1:6030 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
-        wide_rtdb -find.table.general -engine timescaledb -server 127.0.0.1:5432 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt
-                engine:       rtdb      RTDB (http://www.rtdb.com).
-                              taos      TAOS (http://www.taosdata.com).
-                              timescaledb      TIMESCALEDB (https://www.timescale.com/).
-                server:       server address, format is 'ip:port'.
-                thread:       how many threads used to find data, default thread count same with CPU core count
-                timeout.recv: socket connect timeout by ms. '3000' by default.
-                start_time:   start time.
-                step_time:    after find data for all tables once, the timestamp adjusted to increment a fixed interval. This value is the fixed interval.
-                              unit is ms, default value is 3600000, that means 1 hour.
-                stop_time:    stop time.  default forever
-                              YYYY-MM-DD               stop date string.
-                              YYYY-MM-DD HH:mm:SS.000  stop time string.
-                              2s                       stop time after n seconds.
-                              2m                       stop time after n minutes.
-                              2h                       stop time after n hours.
-                              2d                       stop time after n days.
-                              2w                       stop time after n weeks.
-                stop_line:    when total line findded, then finish and quit. default value is 0, that means always running.
-                path:         file path generate by 'general_table.conf' file.
-                format:       only support 'txt', default value is 'txt'
-
-example: general_table.conf: 
-
-                 #DB, DB_TEST_WRITE 
-                 # table_lead    primary_key_field_name  table_tail_field_name   table_tail_list      file_path 
-                 # table_lead      : prefix the table name 
-                 # primary_key_field_name : Primary key field name can be empty 
-                 # table_tail_field_name : Indicates the field name associated with the table name suffix Can be empty 
-                 # table_tail_list : List of table name suffixes 
-                 # file_path : Tabular path 
-                 # Note: The list at the end of the table is separated by commas between each table [1, 3]. This format can be used, but the premise must be that the data and the right side is greater than the left side 
-                 process_               A, B    ./general_process.txt 
-                 location_              A, D, E, F      ./general_location.txt 
-                 TABLE_         [1, 5]  ./general_std.txt 
-
-example: general_data.conf:
-
-                 # table_lead     : prefix the table name 
-                 # data_path_list : List of data file paths 
-                 # notion         : Use commas to separate the list of data file paths 
-                 process_       ./process-modify.csv 
-                 location_      ./location - modify.csv 
-                 TABLE_ ./general_std.txt.data 
-
-example: general_std.txt: 
-
-                 # this file for general std table 
-                 ################################# 
-                 FIELD_0 bool, FIELD_1 int, FIELD_2 bigint, FIELD_3 float, FIELD_4 double, FIELD_5 varchar(32), FIELD_6 timestamp 
-
-example: general_std.txt.data: 
-
-                 FIELD_0        FIELD_1 FIELD_2 FIELD_3 FIELD_4 FIELD_5 FIELD_6 
-                 false  0       0       0.23    0.23    '0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx32'      '2020-01-01 00:00:00.000' 
-                 false  1000    1000    1.23    1.23    '1000xxxxxxxxxxxxxxxxxxxxxxxxxx32'      '2020-01-01 00:00:01.000' 
-```
-
 ## Usage
-1、用如下命令生成 60 万张表的信息。
+### 1、创建表
+通过以下命令创建5千张表
+#### windows平台（create_table_general.bat）
+> call "rtdb_import.exe" -create.table.general -engine rtdb -server 192.168.1.43:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path data\general_table.conf -format txt  -db DB_TEST_WRITE
+{.is-info}
 
-> wide_rtdb.exe -generate.table -dst ./generate_table.txt -format txt -db DB_wide -table_lead TABLE_ -bool 200000 -int 200000 -float 200000
+#### linux平台（create_table_general.sh）
+> ./rtdb_import -create.table.general -engine rtdb -server 192.168.1.43:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path data/general_table.conf -format txt  -db DB_TEST_WRITE
+{.is-info}
+
+### 创建表参数解释
+
+  |   参数名称              | 参数说明            |        描述                           |
+  | ----                  |  -                 |   ---                                |
+  | create.table.general  | 执行建表操作         |                                       |
+  | engine                | 执行哪种数据库引擎    | 目前分别支持: rtdb,taos,timescaledb     |
+  | server                | 数据库服务的host url | 服务器ip地址与端口号                     |
+  | thread                | 线程数              |                                      |
+  | timeout.conn          | 网络连接超时时间      |  单位毫秒，  infinite：表示没有超时时间   |
+  | timeout.send          | 发送网络消息超时时间   |  单位毫秒，  infinite：表示没有超时时间   |
+  | timeout.recv          | 接收网络消息超时时间   |  单位毫秒，  infinite：表示没有超时时间   |
+  | path                  | 创建表的结构模板文件   |                                      |
+  | format                | 模板文件的格式        | 目前只支持txt                          |
+  | db                    | 数据库名称           |                                      |
+   
+### general_table.conf 格式说明
+
+> TABLE_			    [1, 5000] 	data/general_std.txt
+{.is-info}
+
+  |   参数                 | 参数说明                                                     | 
+  | ----                  |  -                                                          |  
+  | TABLE_                | 表名称的前缀，由用户自定义，如：process_、location_               | 
+  | [1, 5000]             | 表名称的后缀，也可以理解表名的下标范围                             |  
+  |                       | 系统根据表名的前缀与后缀范围，构建表名称                           | 
+  |                       | 如：TABLE_1,TABLE_2，....                                    | 
+  | data/general_std.txt  | 表格式模板，用户通过模板定义表的字段、类型、大小以及是否支持空         | 
+  
+### 2、导入数据
+通过以下命令导入数据。
+*注：如果命令中不指定path参数，也就是不指定数据源，系统会根据表结构中字段的数据类型，模拟生成数据。*
+#### windows平台（import_data.bat）
+> call "rtdb_import.exe" -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  /start_time '2020-01-01' -step_time 1000  -sql_size 128k -path data\general_data.conf -format csv -db DB_TEST_WRITE -table_conf data\general_table.conf
+{.is-info}
+
+#### linux平台（import_data.sh）
+> ./rtdb_import -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 40 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000  -stop_time 1h -sql_size 128k -path data/general_data.conf -format csv  -db DB_TEST_WRITE -table_conf data/general_table.conf
+{.is-info}
+
+### 导入数据参数解释
+
+  |   参数名称              | 参数说明            |        描述                           |
+  | ----                  |  -                 |   ---                                |
+  | insert.table.general  | 执行插入数据操作         |                                       |
+  | engine                | 执行哪种数据库引擎    | 目前分别支持: rtdb,taos,timescaledb     |
+  | server                | 数据库服务的host url | 服务器ip地址与端口号                     |
+  | thread                | 线程数              |                                      |
+  | timeout.conn          | 网络连接超时时间      |  单位毫秒，  infinite：表示没有超时时间   |
+  | timeout.send          | 发送网络消息超时时间   |  单位毫秒，  infinite：表示没有超时时间   |
+  | timeout.recv          | 接收网络消息超时时间      |  单位毫秒，  infinite：表示没有超时时间   |
+  | start_time            | 导入数据的开始时间        |                                     |
+  | step_time             | 相邻两条数据之间的时间间隔 | 单位毫秒                               |
+  | sql_size              | 最大sql命令的字节数   | 建议128K                               |
+  | path                  | 导入数据的配置信息文件   |                                      |
+  | format                | 导入数据文件的格式        | 目前支持txt与csv                          |
+  | db                    | 数据库名称           |                                      |
+  | table_conf            | 表的结构模板文件      |                                      |
+   
+### general_data.conf  导入数据的配置说明
+
+> TABLE_	data/general_std.txt.data
+{.is-info}
+
+  |   参数                 | 参数说明                                                     | 
+  | ----                  |  -                                                          |  
+  | TABLE_                | 该前缀对应的表的数据源文件                                       | 
+  
+  
+### general_std.txt.data  导入数据源格式说明
+不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：空格“ ”、逗号“，”、顿号“、”。
+
+> FIELD_0	FIELD_1	FIELD_2	FIELD_3	FIELD_4	FIELD_5	FIELD_6	FIELD_7	FIELD_8	FIELD_9	FIELD_10	FIELD_11	FIELD_12	FIELD_13
+> false	0	0	0.23	0.23	'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx32'	'2020-01-01 00:00:00.000'	false	0	0	0.23	0.23	'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx64'	'2020-01-01 00:00:00.000'
 {.is-info}
 
 
+### 3、查询数据
 
+通过以下命令查询一定时间范围内的数据。
 
+#### windows平台（find_table_general.bat）
+> call "rtdb_import.exe" -find.table.general -engine rtdb -server 192.168.1.43:1234 -thread 80 -timeout.recv infinite /start_time '2020-01-01' -step_time 1000 -stop_time 5h -db DB_TEST_WRITE -path data/general_table.conf -format txt
+{.is-info}
 
+#### linux平台（find_table_general.sh）
+> ./rtdb_import -find.table.general -engine rtdb -server 192.168.1.43:1234 -thread 5 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 5h -db DB_TEST_WRITE -path data/general_table.conf -format txt
+{.is-info}
 
+### 查询数据参数解释
 
-
-
-
-
-
+  |   参数名称              | 参数说明            |        描述                           |
+  | ----                  |  -                 |   ---                                |
+  | find.table.general    | 执行查询数据操作      |                                       |
+  | engine                | 执行哪种数据库引擎    | 目前分别支持: rtdb,taos,timescaledb     |
+  | server                | 数据库服务的host url | 服务器ip地址与端口号                     |
+  | thread                | 线程数              |                                      |
+  | timeout.conn          | 网络连接超时时间      |  单位毫秒，  infinite：表示没有超时时间   |
+  | timeout.send          | 发送网络消息超时时间   |  单位毫秒，  infinite：表示没有超时时间   |
+  | timeout.recv          | 接收网络消息超时时间      |  单位毫秒，  infinite：表示没有超时时间   |
+  | start_time            | 以什么时间作为查询数据的开始时间  |                          |
+  | step_time             | 相邻两次查询之前的查询的开始时间的时间间隔 | 单位毫秒          |
+  | stop_time             | 每次查询的时间范围  | 单位：（s:秒，m：分钟，h：小时，d：天，w：周）  |
+  | path                  | 表的结构模板文件   |                                      |
+  | format                | 表的结构模板文件的格式        | 目前只支持txt                 |
+  | db                    | 数据库名称           |                                      |
+   
+注：将时间范围是以滚动向前的方式不断循环查询，每次查询的时间范围如下所示：
+> 第一次查询的时间范围：\[start_time，start_time+stop_time\]
+> 第二次查询的时间范围：\[start_time+step_time，start_time+step_time+stop_time\]
+> 第n次查询的时间范围：\[start_time+step_time*（n-1），start_time+step_time*（n-1）+stop_time\]
 
 

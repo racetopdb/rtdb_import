@@ -27,7 +27,7 @@ static void usage( int argc, char ** argv )
     std::stringstream ss;
     ss << S_CRLF S_CRLF;
 
-    ss << "generate test data:" S_CRLF S_CRLF;
+    ss << "generate import data:" S_CRLF S_CRLF;
     ss << "\t" << ph << " -generate.data.general  -thread 2 -path ./general_table.conf -format txt  -start_time 2020-01-01 -step_time 1000 -stop_time 2020-02-01 -line_count 100"   << S_CRLF;
     ss << "\t\tthread:       how many threads used to create data, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\tpath:         file path generate by 'general_table.conf' file." << S_CRLF;
