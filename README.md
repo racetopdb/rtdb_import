@@ -9,7 +9,6 @@ RTDB是一款高性能、高可用、跨平台、分布式、自主可控、支�
 TDEngine ：https://github.com/taosdata/TDengine
 Timescale: https://github.com/timescale/timescaledb
 
-
 # Features
 - **支持的数据类型**
 下表所示RTDB支持的数据类型。其中，“**数据类型及别名**”列中所示的内容都可以在SQL语句中使用。我们在SQL99标准以外，支持更多的数据类型别名，是为了与更广泛的与其它数据库兼容。
@@ -98,10 +97,13 @@ linux，gcc
 
 ## Build
 - **windows**
-执行wide_table.sln编译
+
+执行rtdb_import.sln完成编译
 
 - **linux**
+
 cd make
+
 执行 sh build.sh
 
 ## Installation
@@ -233,7 +235,9 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
    
 注：将时间范围是以滚动向前的方式不断循环查询，每次查询的时间范围如下所示：
 > 第一次查询的时间范围：\[start_time，start_time+stop_time\]
+> 
 > 第二次查询的时间范围：\[start_time+step_time，start_time+step_time+stop_time\]
+> 
 > 第n次查询的时间范围：\[start_time+step_time*（n-1），start_time+step_time*（n-1）+stop_time\]
 
 
