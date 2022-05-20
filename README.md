@@ -5,8 +5,11 @@
 RTDB是一款高性能、高可用、跨平台、分布式、自主可控、支持SQL，具备高效的数据调度能力和分析能力的时序数据库。为满足时序场景第一需求：大数据高并发实时入库与毫秒级查询响应。不走技术路线依赖，不依赖任何开源库，重新定义底层存储架构与算法，深耕实现每行代码。
 
 使用RTDB_IMPORT做为数据导入工具既可以往RTDB时序数据存储引擎完成时序数据的高效导入与查询，同时为了让大家对RTDB有更深入客观的了解，该项目也适配了TDEngine与Timescale的数据导入与查询操作。
+
 关于TDEngine与Timescale请分别参阅：
+
 TDEngine ：https://github.com/taosdata/TDengine
+
 Timescale: https://github.com/timescale/timescaledb
 
 # Features
