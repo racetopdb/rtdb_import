@@ -265,3 +265,7 @@ Timescale数据库服务安装请参考：(https://github.com/timescale/timescal
 > 第n次查询的时间范围：\[start_time+step_time*（n-1），start_time+step_time*（n-1）+stop_time\]
 
 
+## License
+
+GNU Lesser General Public License version 3
+
