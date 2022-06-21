@@ -145,11 +145,17 @@ TAOS 数据库客户端接口只能通过 -ltaos 编译选项连接，所以要�
 
 数据库服务安装
 
-RTDB数据库服务安装请参考：（https://rtdb.com/document?id=62273cc6aa303062f31a644a）
+RTDB 数据库服务安装请参考：（https://rtdb.com/document?id=62273cc6aa303062f31a644a）
 
-TDengine数据库服务安装请参考：(https://github.com/taosdata/TDengine)
+InfluxDB 数据库服务安装请参考：(https://github.com/influxdata/influxdb)
 
-Timescale数据库服务安装请参考：(https://github.com/timescale/timescaledb)
+OpenTSDB 数据库服务安装请参考：(https://github.com/OpenTSDB/opentsdb)
+
+Timescale 数据库服务安装请参考：(https://github.com/timescale/timescaledb)
+
+TDengine 数据库服务安装请参考：(https://github.com/taosdata/TDengine)
+
+
 
 ## Usage
 ### 1、创建表
