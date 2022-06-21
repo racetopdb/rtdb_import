@@ -1991,6 +1991,10 @@ int rtdb::wide::add_add_single_quotes_for_string_and_timestamp(
     const char* ptr = ts.ptr;
     int             len = ts.len;
 
+    if (0 != len && 0 == strncmp("null", ptr, len)) {
+        value += "null";
+        return 0;
+    }
     // 数据长度为0  
     if (0 == ts.len) {
         value += "\'";
@@ -2116,7 +2120,7 @@ int rtdb::wide::deal_with_for_boolean(std::string& value, tsdb_str& ts, enum tsd
     int             len = ts.len;
 
     // 数据长度为0  
-    if (0 == ts.len) {
+    if (0 == ts.len || 0 == strncmp("null", ptr, ts.len)) {
         value += "null";
         return 0;
     }

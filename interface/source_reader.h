@@ -6,6 +6,9 @@
 
 namespace rtdb
 {
+namespace test
+{
+
 class field_value_t
 {
 public:
@@ -126,6 +129,8 @@ private:
     import_worker_t(const import_worker_t &);
     const import_worker_t & operator = (const import_worker_t &);
 }
-} // namespace rtdb
+
+} // namespace test
+} // namespace wide_table
 
 #endif

@@ -14,6 +14,11 @@
 #define ENABLE_TIMESCALEDB     1
 #endif
 
+
+#define ENABLE_OPENTSDB     1
+
+#define ENABLE_INFLUXDB     1
+
 namespace rtdb
 {
 
@@ -30,8 +35,12 @@ enum db_type_t
 
     DB_TIMESCALEDB = 3,
 
+    DB_OPENTSDB = 4,
+
+    DB_INFLUXDB = 5,
+
     #define DB_FIRST    DB_RTDB
-    #define DB_LAST     DB_TIMESCALEDB
+    #define DB_LAST     DB_INFLUXDB
 };
 
 bool        rtdb_init( const char * path );

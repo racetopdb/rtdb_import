@@ -55,13 +55,25 @@ static void usage( int argc, char ** argv )
 #if ENABLE_TIMESCALEDB
     ss << "\t" << ph << " -create.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE" << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
+#if ENABLE_OPENTSDB
+    ss << "\t" << ph << " -create.table.general -engine opentsdb -server 192.168.1.43:4242 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE" << S_CRLF;
+#endif // #if ENABLE_OPENTSDB
+#if ENABLE_INFLUXDB
+    ss << "\t" << ph << " -create.table.general -engine influxdb -server 192.168.1.43:8086 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE" << S_CRLF;
+#endif // #if ENABLE_INFLUXDB
     ss << "\t\tengine:       rtdb      RTDB (http://www.rtdb.com)." << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t\t              taos      TAOS (http://www.taosdata.com)." << S_CRLF;
 #endif // #if ENABLE_TDENGINE
 #if ENABLE_TIMESCALEDB
-    ss << "\t\t              timescaledb      TIMESCALEDB (https://www.timescale.com/)." << S_CRLF;
+    ss << "\t\t              timescaledb      TIMESCALEDB (https://www.timescale.com)." << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
+#if ENABLE_OPENTSDB
+    ss << "\t\t              opentsdb      OPENTSDB (http://opentsdb.net)." << S_CRLF;
+#endif // #if ENABLE_OPENTSDB
+#if ENABLE_INFLUXDB
+    ss << "\t\t              influxdb      INFLUXDB (https://www.influxdata.com)." << S_CRLF;
+#endif // #if ENABLE_INFLUXDB
     ss << "\t\tserver:       server address, format is 'ip:port'." << S_CRLF;
     ss << "\t\tthread:       how many threads used to create table, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\ttimeout.conn: socket connect timeout by ms. '3000' by default." S_CRLF;
@@ -80,13 +92,25 @@ static void usage( int argc, char ** argv )
 #if ENABLE_TIMESCALEDB
     ss << "\t" << ph << " -insert.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf" << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
+#if ENABLE_OPENTSDB
+    ss << "\t" << ph << " -find.table.general -engine opentsdb -server 192.168.1.43:4242 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+#endif // #if ENABLE_OPENTSDB
+#if ENABLE_INFLUXDB
+    ss << "\t" << ph << " -find.table.general -engine influxdb -server 192.168.1.43:8086 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+#endif // #if ENABLE_INFLUXDB
     ss << "\t\tengine:       rtdb      RTDB (http://www.rtdb.com)." << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t\t              taos      TAOS (http://www.taosdata.com)." << S_CRLF;
 #endif // #if ENABLE_TDENGINE
 #if ENABLE_TIMESCALEDB
-    ss << "\t\t              timescaledb      TIMESCALEDB (https://www.timescale.com/)." << S_CRLF;
+    ss << "\t\t              timescaledb      TIMESCALEDB (https://www.timescale.com)." << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
+#if ENABLE_OPENTSDB
+    ss << "\t\t              opentsdb      OPENTSDB (http://opentsdb.net)." << S_CRLF;
+#endif // #if ENABLE_OPENTSDB
+#if ENABLE_INFLUXDB
+    ss << "\t\t              influxdb      INFLUXDB (https://www.influxdata.com)." << S_CRLF;
+#endif // #if ENABLE_INFLUXDB
     ss << "\t\tserver:       server address, format is 'ip:port'." << S_CRLF;
     ss << "\t\tthread:       how many threads used to write data, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\ttimeout.conn: socket connect timeout by ms. '3000' by default." S_CRLF;
@@ -119,6 +143,12 @@ static void usage( int argc, char ** argv )
 #if ENABLE_TIMESCALEDB
     ss << "\t" << ph << " -find.table.general -engine timescaledb -server 127.0.0.1:5432 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
+#if ENABLE_OPENTSDB
+    ss << "\t" << ph << " -find.table.general -engine opentsdb -server 127.0.0.1:4242 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+#endif // #if ENABLE_OPENTSDB
+#if ENABLE_INFLUXDB
+    ss << "\t" << ph << " -find.table.general -engine influxdb -server 127.0.0.1:8086 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+#endif // #if ENABLE_INFLUXDB
     ss << "\t\tengine:       rtdb      RTDB (http://www.rtdb.com)." << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t\t              taos      TAOS (http://www.taosdata.com)." << S_CRLF;
@@ -126,6 +156,12 @@ static void usage( int argc, char ** argv )
 #if ENABLE_TIMESCALEDB
     ss << "\t\t              timescaledb      TIMESCALEDB (https://www.timescale.com/)." << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
+#if ENABLE_OPENTSDB
+    ss << "\t\t              opentsdb      OPENTSDB (http://opentsdb.net)." << S_CRLF;
+#endif // #if ENABLE_OPENTSDB
+#if ENABLE_INFLUXDB
+    ss << "\t\t              influxdb      INFLUXDB (https://www.influxdata.com)." << S_CRLF;
+#endif // #if ENABLE_INFLUXDB
     ss << "\t\tserver:       server address, format is 'ip:port'." << S_CRLF;
     ss << "\t\tthread:       how many threads used to find data, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\ttimeout.recv: socket connect timeout by ms. '3000' by default." S_CRLF;

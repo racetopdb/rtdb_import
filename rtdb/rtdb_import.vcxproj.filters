@@ -39,6 +39,15 @@
     <Filter Include="TIMESCALEDB\include\catalog">
       <UniqueIdentifier>{9b649f8f-d7a7-485a-bab7-5cb7cb76ff68}</UniqueIdentifier>
     </Filter>
+    <Filter Include="OPENTSDB">
+      <UniqueIdentifier>{51a5265e-3696-46a5-8df8-66d581c29e57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CJSON">
+      <UniqueIdentifier>{daffc252-b4a8-46c6-821e-1ae508dc3e09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="INFLUXDB">
+      <UniqueIdentifier>{94baf808-c26d-4233-9c61-4b85e6e79062}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="generate.cpp">
@@ -118,6 +127,27 @@
     </ClCompile>
     <ClCompile Include="TIMESCALEDB\wide_timescaledb_conn.cpp">
       <Filter>TIMESCALEDB</Filter>
+    </ClCompile>
+    <ClCompile Include="HTTP.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="OPENTSDB\wide_opentsdb.cpp">
+      <Filter>OPENTSDB</Filter>
+    </ClCompile>
+    <ClCompile Include="OPENTSDB\wide_opentsdb_conn.cpp">
+      <Filter>OPENTSDB</Filter>
+    </ClCompile>
+    <ClCompile Include="CJSON\cJSON.cpp">
+      <Filter>CJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="CJSON\cJSON_Utils.cpp">
+      <Filter>CJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="INFLUXDB\wide_influxdb.cpp">
+      <Filter>INFLUXDB</Filter>
+    </ClCompile>
+    <ClCompile Include="INFLUXDB\wide_influxdb_conn.cpp">
+      <Filter>INFLUXDB</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -202,9 +232,31 @@
     <ClInclude Include="TIMESCALEDB\wide_timescaledb_conn.h">
       <Filter>TIMESCALEDB</Filter>
     </ClInclude>
+    <ClInclude Include="HTTP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="OPENTSDB\wide_opentsdb.h">
+      <Filter>OPENTSDB</Filter>
+    </ClInclude>
+    <ClInclude Include="OPENTSDB\wide_opentsdb_conn.h">
+      <Filter>OPENTSDB</Filter>
+    </ClInclude>
+    <ClInclude Include="CJSON\cJSON.h">
+      <Filter>CJSON</Filter>
+    </ClInclude>
+    <ClInclude Include="CJSON\cJSON_Utils.h">
+      <Filter>CJSON</Filter>
+    </ClInclude>
+    <ClInclude Include="INFLUXDB\wide_influxdb.h">
+      <Filter>INFLUXDB</Filter>
+    </ClInclude>
+    <ClInclude Include="INFLUXDB\wide_influxdb_conn.h">
+      <Filter>INFLUXDB</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="makefile" />
     <None Include="..\README.md" />
+    <None Include="..\make\build.mk" />
+    <None Include="..\make\centos73\makefile" />
   </ItemGroup>
 </Project>

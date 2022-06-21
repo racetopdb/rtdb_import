@@ -1,8 +1,11 @@
 #include "wide_base.h"
+#include "utils.h"
+#include "cJSON.h"
 #include <assert.h>
 #include <string>
 #include <map>
-#include "utils.h"
+#include "OPENTSDB/wide_opentsdb.h"
+
 
 #define FIND_USE_TIMESTAMP    1
 
@@ -80,7 +83,109 @@ struct thread_param_find_table_general_t
     char                        padding[ 64 ];
 };
 
-void * find_table_general_thread( void * _param )
+
+// 封装查询为opentsdb  
+// 类似这样的查询json  
+#if 0
+{
+    "start": 1435716527000,
+        "end" : 1435716529000,
+        "msResolution" : true,
+        "queries" : [
+    {
+        "metric": "test.t4",
+            "aggregator" : "count",
+            "tags" : {
+        }
+    }
+        ]
+}
+#endif
+int  query_has_result_wrapper_for_opentsdb(
+    thread_param_find_table_general_t* param, 
+    struct table_lead_and_table_name_t& tlatn, 
+    std::string& sql, 
+    uint64_t &row_count)
+{
+    int r = 0;
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    rtdb::cJSON* root = NULL;
+    char* sql_for_opentsdb = NULL;
+
+    do 
+    {
+        root = rtdb::cJSON_CreateObject();
+        if (NULL == root) {
+            TSDB_ERROR(p, "[FIND][worker_id:%d] cJSON_CreateObject is NULL not support", param->thread_id);
+            r = ENOMEM;
+            break;
+        }
+
+        rtdb::cJSON_AddNumberToObject(root, "start", (double)param->start_time);
+        rtdb::cJSON_AddNumberToObject(root, "end", (double)(param->start_time + param->step_time - 1));
+        rtdb::cJSON_AddTrueToObject(root, "msResolution");
+
+        rtdb::cJSON* querie_array = rtdb::cJSON_CreateArray();
+        if (NULL == querie_array) {
+            TSDB_ERROR(p, "[FIND][worker_id:%d] cJSON_CreateArray is NULL not support", param->thread_id);
+            r = ENOMEM;
+            break;
+        }
+
+
+        rtdb::cJSON* item = rtdb::cJSON_CreateObject();
+        if (NULL == item) {
+            TSDB_ERROR(p, "[FIND][worker_id:%d] cJSON_CreateObject is NULL not support", param->thread_id);
+            r = ENOMEM;
+            break;
+        }
+
+        std::string table_name = param->db;
+        table_name += ".";
+        table_name += tlatn.table_name;
+        rtdb::cJSON_AddStringToObject(item, "metric", table_name.c_str());
+        rtdb::cJSON_AddStringToObject(item, "aggregator", "count");
+        rtdb::cJSON* tags = rtdb::cJSON_CreateObject();
+        if (NULL == tags) {
+            TSDB_ERROR(p, "[FIND][worker_id:%d] cJSON_CreateObject is NULL not support", param->thread_id);
+            r = ENOMEM;
+            break;
+        }
+        rtdb::cJSON_AddItemToObject(item, "tags", tags);
+
+        rtdb::cJSON_AddItemToArray(querie_array, item);
+        rtdb::cJSON_AddItemToObject(root, "queries", querie_array);
+
+        char* sql_for_opentsdb = rtdb::cJSON_PrintUnformatted(root);
+        if (NULL == sql_for_opentsdb) {
+            TSDB_ERROR(p, "[FIND][worker_id:%d] cJSON_PrintUnformatted is NULL not support", param->thread_id);
+            r = EINVAL;
+            break;
+        }
+        sql.assign(sql_for_opentsdb, strlen(sql_for_opentsdb));
+        r = param->conn->query_has_result(sql.c_str(), sql.size(), row_count);
+        if (unlikely(0 != param->r)) {
+            TSDB_ERROR(p, "[FIND][thread_id=%d][r=%d] find from table failed: %s", param->thread_id, param->r, sql.c_str());
+            break;
+        }
+    } while (0);
+
+    if (sql_for_opentsdb) {
+        rtdb::cJSON_free(sql_for_opentsdb);
+        sql_for_opentsdb = NULL;
+    }
+
+    if (root) {
+        rtdb::cJSON_Delete(root);
+        root = NULL;
+    }
+
+    return r;
+}
+
+void* find_table_general_thread(void* _param)
 {
     thread_param_find_table_general_t * param = (thread_param_find_table_general_t *)_param;
 
@@ -179,31 +284,78 @@ void * find_table_general_thread( void * _param )
             struct table_lead_and_table_name_t &tlatn = vt_table_lead_and_table_name_t[i];
             struct test_table_file_info_t & ttfi  = (*param->map_test_table_file_info_t)[tlatn.table_lead];
 
-            // construct the SQL statement.
-            name.assign(tlatn.table_name);
-            sql  = "select * from ";
-            sql += name;
-            sql += " where time between ";
-            sql += "\'";
-            sql += time_b;
-            sql += "\'";
-            sql += " and ";
-            sql += "\'";
-            sql += time_e;
-            sql += "\'";
-            sql += ";";
 
-            // execute the SQL return value stored to param->r.
-            uint64_t row_count;
-            param->r = param->conn->query_has_result( sql.c_str(), sql.size(), row_count );
-            if ( unlikely( 0 != param->r ) ) {
-                TSDB_ERROR( p, "[FIND][thread_id=%d][r=%d] find from table failed: %s", param->thread_id, param->r, sql.c_str() );
-                param->exited = true;
-                return NULL;
+            uint64_t row_count = 0;
+            // engine == opentsdb  
+            if (DB_OPENTSDB == param->engine) {
+                param->r =  query_has_result_wrapper_for_opentsdb(param, tlatn, sql, row_count);
+                if (unlikely(0 != param->r)) {
+                    TSDB_ERROR(p, "[FIND][thread_id=%d][r=%d] query_has_result_wrapper_for_opentsdb failed: %s", param->thread_id, param->r, sql.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
             }
+            else { // 非 opentsdb  
+                if (DB_INFLUXDB == param->engine) {
+                    time_b[10] = 'T';
+                    time_e[10] = 'T';
+                    name.assign(tlatn.table_name);
+                    sql = "select * from ";
+                    sql += name;
+                    sql += " where time >= ";
+                    sql += "\'";
+                    sql += time_b;
+                    sql += "+08:00";                   // 北京时间比UTC多8个小时  
+                    sql += "\'";
+                    sql += " and ";
+                    sql += " time <=";
+                    sql += "\'";
+                    sql += time_e;
+                    sql += "+08:00";                   // 北京时间比UTC多8个小时  
+                    sql += "\'";
+
+                    sql += " ";
+                    sql += "TZ(\'Asia/Shanghai\')";  // 必须是亚洲上海  
+                    
+                    sql += ";";
+                }
+                else { // 非 influxdb  
+                    // construct the SQL statement.
+                    name.assign(tlatn.table_name);
+                    sql = "select * from ";
+                    sql += name;
+                    sql += " where time between ";
+                    sql += "\'";
+                    sql += time_b;
+                    sql += "\'";
+                    sql += " and ";
+                    sql += "\'";
+                    sql += time_e;
+                    sql += "\'";
+                    sql += ";";
+                }
+                
+                // execute the SQL return value stored to param->r.
+
+                param->r = param->conn->query_has_result(sql.c_str(), sql.size(), row_count);
+                if (unlikely(0 != param->r)) {
+                    TSDB_ERROR(p, "[FIND][thread_id=%d][r=%d] find from table failed: %s", param->thread_id, param->r, sql.c_str());
+                    param->exited = true;
+                    return NULL;
+                }
+            }
+            
             ++ param->find_count;
             param->find_line_count += row_count;
-            param->find_point += (row_count*(ttfi.vt_test_tb_field_info_t.size()-1));  // 去除主键  
+            if (DB_OPENTSDB == param->engine) {
+                int fields_count = 
+                    (int)(ttfi.vt_test_tb_field_info_t.size() >= MAX_OPENTSDB_FILES_COUNT ? MAX_OPENTSDB_FILES_COUNT : ttfi.vt_test_tb_field_info_t.size());
+                param->find_point += (row_count*(fields_count-1));  // 去除主键  
+            }
+            else { // 非 opentsdb
+                param->find_point += (row_count*(ttfi.vt_test_tb_field_info_t.size()-1));  // 去除主键  
+            }
+            
 
             if ( unlikely( param->stop_line > 0 && param->find_line_count >= param->stop_line ) ) {
                 TSDB_INFO( p, "[FIND][thread_id=%d]STOP", param->thread_id );
@@ -287,7 +439,7 @@ int find_table_general( int argc, char ** argv )
         p->tools->find_argv( argc, argv, "path", & _path, NULL );
         if ( NULL == _path || '\0' == * _path ) {
             if (NULL == _path || '\0' == *_path) {
-                TSDB_ERROR(p, "[INSERT] not found table_conf");
+                TSDB_ERROR(p, "[FIND] not found table_conf");
                 return EINVAL;
             }
         }

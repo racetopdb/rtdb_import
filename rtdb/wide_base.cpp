@@ -2,6 +2,8 @@
 #include "RTDB/wide_rtdb.h"
 #include "TAOS/wide_taos.h"
 #include "../wide_timescaledb.h"
+#include "OPENTSDB/wide_opentsdb.h"
+#include "INFLUXDB/wide_influxdb.h"
 
 namespace rtdb
 {
@@ -51,7 +53,20 @@ db_type_t get_db_type( int argc, char ** argv )
         return DB_TIMESCALEDB;
 #endif // #if ENABLE_TIMESCALEDB
          return DB_UNKNOWN;
-    } else {
+    } 
+    else if (0 == stricmp("opentsdb", engine)) {
+#if ENABLE_OPENTSDB
+        return DB_OPENTSDB;
+#endif // #if ENABLE_OPENTSDB
+        return DB_UNKNOWN;
+    }
+    else if (0 == stricmp("influxdb", engine)) {
+#if ENABLE_INFLUXDB
+        return DB_INFLUXDB;
+#endif // #if ENABLE_INFLUXDB
+        return DB_UNKNOWN;
+    }
+    else {
         TSDB_ERROR( p, "[engine=%s]invalid engine, only supported: rtdb | taos | timescaledb", engine );
         return DB_UNKNOWN;
     }
@@ -83,6 +98,22 @@ wide_base_t * wide_base_t::instance( db_type_t type, int argc, char ** argv )
                 o = new wide_timescaledb_t();
 #else
                 TSDB_ERROR( p, "[type=%d]this system version not support for timescale", (int)type );
+                o = NULL;
+#endif
+                break;
+            case DB_OPENTSDB:
+#if ENABLE_OPENTSDB
+                o = new wide_opentsdb_t();
+#else
+                TSDB_ERROR(p, "[type=%d]this system version not support for opentsdb", (int)type);
+                o = NULL;
+#endif
+                break;
+            case DB_INFLUXDB:
+#if ENABLE_INFLUXDB
+                o = new wide_influxdb_t();
+#else
+                TSDB_ERROR(p, "[type=%d]this system version not support for influxdb", (int)type);
                 o = NULL;
 #endif
                 break;

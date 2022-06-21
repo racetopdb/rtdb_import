@@ -2,15 +2,20 @@
 RTDB_PATH   = ../../rtdb/RTDB
 TAOS_PATH   = ../../rtdb/TAOS
 TIMESCALEDB_PATH = ../../rtdb/TIMESCALEDB
+CURL_PATH = ../../rtdb/CURL
+CJSON_PATH = ../../rtdb/CJSON
+OPENTSDB_PATH = ../../rtdb/OPENTSDB
+INFLUXDB_PATH = ../../rtdb/INFLUXDB
 OUTPUT_PATH  = ../../output
 
-INCLUDE     = -I$(RTDB_PATH)/include -I$(TAOS_PATH)/include -I$(TIMESCALEDB_PATH)/include -I../../rtdb/source -I../../rtdb/source/dir  -I../../rtdb/source/none 
+INCLUDE     = -I$(RTDB_PATH)/include -I$(TAOS_PATH)/include -I$(TIMESCALEDB_PATH)/include -I$(OPENTSDB_PATH)/include -I$(CURL_PATH)/include -I$(CJSON_PATH) -I$(INFLUXDB_PATH) -I../../rtdb/source -I../../rtdb/source/dir  -I../../rtdb/source/none 
 
 RTDB_LIB    = 
 TAOS_LIB    = -L$(TAOS_PATH)/$(PLATFORM) -ltaos
 TIMESCALEDB_LIB    = -L$(TIMESCALEDB_PATH)/$(PLATFORM) -lpq
+CURL_LIB    = -L$(CURL_PATH)/$(PLATFORM) -lcurl
 
-LIB         = -lpthread -pthread -lrt -ldl $(RTDB_LIB) $(TAOS_LIB) $(TIMESCALEDB_LIB)
+LIB         = -lpthread -pthread -lrt -ldl $(RTDB_LIB) $(TAOS_LIB) $(TIMESCALEDB_LIB) $(CURL_LIB)
 
 ifeq ($(debug), false)
 CFLAGS      = -O3 $(FLAGS) $(CPU_FLAGS)
@@ -35,6 +40,16 @@ endif
 ./o/TIMESCALEDB_%.o:       ../../rtdb/TIMESCALEDB/%.cpp
 	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
+./o/CJSON_%.o:       ../../rtdb/CJSON/%.cpp
+	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+
+./o/OPENTSDB_%.o:       ../../rtdb/OPENTSDB/%.cpp
+	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+./o/INFLUXDB_%.o:       ../../rtdb/INFLUXDB/%.cpp
+	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
 
 ./o/rtdb_source_%.o:       ../../rtdb/source/%.cpp
 	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
@@ -52,6 +67,12 @@ wide_RTDB_OBJECTS =  \
 	./o/TAOS_wide_taos_conn.o	\
 	./o/TIMESCALEDB_wide_timescaledb.o	\
 	./o/TIMESCALEDB_wide_timescaledb_conn.o	\
+	./o/CJSON_cJSON.o	\
+	./o/CJSON_cJSON_Utils.o	\
+	./o/OPENTSDB_wide_opentsdb.o	\
+	./o/OPENTSDB_wide_opentsdb_conn.o	\
+	./o/INFLUXDB_wide_influxdb.o	\
+	./o/INFLUXDB_wide_influxdb_conn.o	\
 	./o/rtdb_source_source.o	\
 	./o/rtdb_source_dir_dir_source.o	\
 	./o/rtdb_source_dir_dir_worker.o	\
@@ -70,6 +91,7 @@ wide_RTDB_OBJECTS =  \
 	./o/insert_general.o	\
 	./o/main.o	\
 	./o/utils.o	\
+	./o/HTTP.o	\
 	./o/file_operation.o	\
 	./o/wide_base.o
 	
@@ -88,12 +110,22 @@ rtdb_import: $(wide_RTDB_OBJECTS)
 	rm -rf $(OUTPUT_DIR)/libpq.so
 	rm -rf $(OUTPUT_DIR)/libpq.so.5
 	rm -rf $(OUTPUT_DIR)/libpq.so.5.11
+	rm -rf $(OUTPUT_DIR)/libcurl.a  
+	rm -rf $(OUTPUT_DIR)/libcurl.la  
+	rm -rf $(OUTPUT_DIR)/libcurl.so  
+	rm -rf $(OUTPUT_DIR)/libcurl.so.4  
+	rm -rf $(OUTPUT_DIR)/libcurl.so.4.8.0
+
+
 	cp $(LIB_DIR)/libtsdb.so $(OUTPUT_DIR)/
 	cp $(TAOS_PATH)/$(PLATFORM)/libtaos.so $(OUTPUT_DIR)/libtaos.so.1
 #cp $(TIMESCALEDB_PATH)/$(PLATFORM)/libpq.a $(OUTPUT_DIR)/
 	cp $(TIMESCALEDB_PATH)/$(PLATFORM)/libpq.so.5.11 $(OUTPUT_DIR)/libpq.so.5
 #ln -s $(OUTPUT_DIR)/libpq.so.5.11 $(OUTPUT_DIR)/libpq.so
 #ln -s $(OUTPUT_DIR)/libpq.so.5.11 $(OUTPUT_DIR)/libpq.so.5
+	
+	cp $(CURL_PATH)/$(PLATFORM)/libcurl.so.4.8.0  $(OUTPUT_DIR)/libcurl.so.4
+	
 	
 	$(CPPC) -rdynamic $(LIB)				\
 			$(wide_RTDB_OBJECTS)			\

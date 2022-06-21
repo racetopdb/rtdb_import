@@ -5,12 +5,12 @@
 #include "source/source.h"
 #include "source/dir/dir_source.h"
 #include "source/none/none_source.h"
+#include "cJSON.h"
+#include "OPENTSDB/wide_opentsdb.h"
 #include <assert.h>
 #include <string>
 #include <map>
-
-
-
+#include <sstream>
 
 
 
@@ -18,6 +18,11 @@
 #define ENABLE_WRITE_INSERT_SQL 0
 // 默认CSV文件分割符号  
 #define DEFAULT_CSV_FILE_SEP "\t"
+
+
+// 忽略opentsdb null  
+#define INGORE_OPENTSDB_NULL 1
+
 
 namespace rtdb
 {
@@ -75,7 +80,455 @@ static int insert_into_wrapper(void* _param, const std::string& sql)
 }
 
 
-void * insert_table_general_thread( void * _param )
+// 构建json 为 opentsdb
+int build_json_for_opentsdb(
+    thread_param_insert_table_general_t* param, 
+    const std::string &table_name, 
+    import_worker_t* worker, 
+    const std::string* values, 
+    std::string& sql, 
+    rtdb::cJSON* root)
+{
+    int r = 0;
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    rtdb::cJSON* metric = rtdb::cJSON_CreateObject();
+    if (NULL == metric) {
+        TSDB_ERROR(p, "[INSERT][worker_id:%d] cJSON_CreateArray is NULL not support", param->thread_id);
+        return ENOMEM;
+    }
+    std::string db_table = param->db;
+    db_table += ".";
+    db_table += table_name;
+
+    std::vector<struct test_tb_field_info_t>* vt_ttfi = worker->get_field_info();
+
+
+    int values_count = 0;
+    p->tools->to_const_array(values->c_str(), (int)values->length(), ",", 1, NULL, &values_count);
+
+    std::vector<tsdb_str> vt_values;
+    vt_values.resize(values_count);
+    p->tools->to_const_array(values->c_str(), (int)values->length(), ",", 1, &vt_values[0], &values_count);
+
+    sql.resize(sql.size() + 2); // {}
+    // 如果是首次 少一次逗号  
+    if (4 != sql.size()) {
+        sql.resize(sql.size() + 1); // ,
+    }
+    
+    // metric = db + table_name
+    rtdb::cJSON_AddStringToObject(metric, "metric", db_table.c_str());
+    sql.resize(sql.size() + strlen("metric") + 2);  // ""
+    sql.resize(sql.size() + 1);                     // :
+    sql.resize(sql.size() + strlen(db_table.c_str()) + 2); // ""
+    sql.resize(sql.size() + 1);                     // ,
+
+    // datetime 类似 '2020-01-01 00:00:00.000' 去掉前后单引号  
+    uint64_t timell = p->tools->datetime_from_str(values[0].c_str() + 1, (int)(values[0].length() - 2));
+    rtdb::cJSON_AddNumberToObject(metric, "timestamp", (double)timell);
+    sql.resize(sql.size() + strlen("timestamp") + 2);   // ""
+    sql.resize(sql.size() + 1);                         // :
+    sql.resize(sql.size() + 13); // 时间戳 精确到毫秒大约都是13位数  
+    sql.resize(sql.size() + 1); // ,
+
+
+    rtdb::cJSON_AddNumberToObject(metric, "value", (double)timell);
+    sql.resize(sql.size() + strlen("value") + 2);  // ""
+    sql.resize(sql.size() + 1);                    // :
+    sql.resize(sql.size() + 13);                   // 时间戳 精确到毫秒大约都是13位数  
+    sql.resize(sql.size() + 1);                    // ,
+
+
+    rtdb::cJSON* tags = NULL;
+    tags = rtdb::cJSON_CreateObject();
+    if (NULL == tags) {
+        TSDB_ERROR(p, "[INSERT][worker_id:%d] cJSON_CreateObject is NULL not support", param->thread_id);
+        return ENOMEM;;
+    }
+    sql.resize(sql.size() + 2);                      // {}
+    sql.resize(sql.size() + strlen("tags") + 2);     // ""
+    sql.resize(sql.size() + 1);                      // :
+
+
+    // opentsdb 最多支持MAX_OPENTSDB_FILES_COUNT(9)个字段 (去除时间字段仅能支持8个)  
+    for (int i = 1; i < MAX_OPENTSDB_FILES_COUNT && i < worker->get_field_count(); i++)
+    {
+        std::string& name = (*vt_ttfi)[i].name;
+        enum tsdb_datatype_t datatype = (*vt_ttfi)[i].datatype;
+
+        sql.resize(sql.size() + strlen(name.c_str()) + 2);      // ""
+        sql.resize(sql.size() + 1);                             // :
+
+        switch (datatype)
+        {
+        case TSDB_DATATYPE_BOOL:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" == value) {
+#if INGORE_OPENTSDB_NULL
+                // 默认为false  
+                rtdb::cJSON_AddBoolToObject(tags, name.c_str(), false);
+                sql.resize(sql.size() + strlen("false")); // 
+#else
+                rtdb::cJSON_AddNullToObject(tags, name.c_str());
+                sql.resize(sql.size() + strlen("null")); // 
+#endif
+            }
+            else {
+                if ("true" == value) {
+                    rtdb::cJSON_AddBoolToObject(tags, name.c_str(), true);
+                }
+                else {
+                    rtdb::cJSON_AddBoolToObject(tags, name.c_str(), false);
+                }
+                sql.resize(sql.size() + strlen(value.c_str()));  // 'true' 'false'
+            }
+            
+            break;
+        }
+        case TSDB_DATATYPE_INT:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" == value) {
+#if INGORE_OPENTSDB_NULL
+                // 默认为0  
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), 0);
+                sql.resize(sql.size() + strlen("0")); // 
+#else
+                rtdb::cJSON_AddNullToObject(tags, name.c_str());
+                sql.resize(sql.size() + strlen("null")); // 
+#endif
+            }
+            else {
+                int valuei = atoi(value.c_str());
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), valuei);
+                sql.resize(sql.size() + strlen(value.c_str())); //
+            }
+            break;
+        }
+        case TSDB_DATATYPE_INT64:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" == value) {
+#if INGORE_OPENTSDB_NULL
+                // 默认为0  
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), 0);
+                sql.resize(sql.size() + strlen("0")); // 
+#else
+                rtdb::cJSON_AddNullToObject(tags, name.c_str());
+                sql.resize(sql.size() + strlen("null"));
+#endif
+            }
+            else {
+#if defined(_WIN32) || defined(_WIN64)
+                int64_t valuell = _atoi64(value.c_str());
+#else
+                int64_t valuell = atoll(value.c_str());
+#endif
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), (double)valuell);
+                sql.resize(sql.size() + strlen(value.c_str())); // 
+            }
+
+            break;
+        }
+        case TSDB_DATATYPE_FLOAT:
+        case TSDB_DATATYPE_DOUBLE:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" == value) {
+#if INGORE_OPENTSDB_NULL
+                // 默认为0  
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), 0);
+                sql.resize(sql.size() + strlen("0")); // 
+#else
+                rtdb::cJSON_AddNullToObject(tags, name.c_str());
+                sql.resize(sql.size() + strlen("null"));  // 
+#endif
+            }
+            else {
+                double valuef = atof(value.c_str());
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), valuef);
+                sql.resize(sql.size() + strlen(value.c_str())); //
+            }
+
+            break;
+        }
+
+        case TSDB_DATATYPE_STRING:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" == value) {
+#if INGORE_OPENTSDB_NULL
+                // 默认为"null"
+                rtdb::cJSON_AddStringToObject(tags, name.c_str(), "null");
+                sql.resize(sql.size() + strlen("null") + 2); // ""
+#else
+                rtdb::cJSON_AddNullToObject(tags, name.c_str());
+                sql.resize(sql.size() + strlen("null")); // 
+#endif
+            }
+            else {
+                std::string value_s = std::string(value.c_str() + 1, value.length() - 2);
+                rtdb::cJSON_AddStringToObject(tags, name.c_str(), value_s.c_str());
+                sql.resize(sql.size() + strlen(value.c_str())-2 + 2); // ""
+            }
+            break;
+        }
+        case TSDB_DATATYPE_DATETIME_MS:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" == value) {
+#if INGORE_OPENTSDB_NULL
+                // 默认为"2010-01-01 00:00:00.000" 
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), (double)1262275200000);
+                sql.resize(sql.size() + 13); // 时间戳 标准毫秒 13位  
+#else
+                rtdb::cJSON_AddNullToObject(tags, name.c_str());
+                sql.resize(sql.size() + strlen("null")); // 
+#endif
+            }
+            else {
+                uint64_t valuell = p->tools->datetime_from_str(value.c_str() + 1, (int)(value.length() - 2));
+                rtdb::cJSON_AddNumberToObject(tags, name.c_str(), (double)valuell);
+                sql.resize(sql.size() + 13); // 时间戳 标准毫秒 13位  
+
+            }
+
+            break;
+        }
+        case TSDB_DATATYPE_BINARY:
+        case TSDB_DATATYPE_POINTER:
+        case TSDB_DATATYPE_TAG_STRING:
+        case TSDB_DATATYPE_UNKNOWN:
+        default:
+            break;
+        }
+        // 少记录一次  
+        if (1 != i) {
+            sql.resize(sql.size() + 1);  // ,
+        }
+    }
+    
+    rtdb::cJSON_AddItemToObject(metric, "tags", tags);
+    rtdb::cJSON_AddItemToArray(root, metric);
+
+    return 0;
+}
+
+
+// 构建json 为 influxdb
+int build_json_for_influxdb(
+    thread_param_insert_table_general_t* param,
+    const std::string& table_name,
+    import_worker_t* worker,
+    const std::string* values,
+    std::string& sql)
+{
+    int r = 0;
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    std::stringstream ss;
+ 
+    ss << table_name;
+    ss << " ";
+    
+
+    std::vector<struct test_tb_field_info_t>* vt_ttfi = worker->get_field_info();
+
+
+    int values_count = 0;
+    p->tools->to_const_array(values->c_str(), (int)values->length(), ",", 1, NULL, &values_count);
+
+    std::vector<tsdb_str> vt_values;
+    vt_values.resize(values_count);
+    p->tools->to_const_array(values->c_str(), (int)values->length(), ",", 1, &vt_values[0], &values_count);
+
+
+    // datetime 类似 '2020-01-01 00:00:00.000' 去掉前后单引号  
+    uint64_t timell = p->tools->datetime_from_str(values[0].c_str() + 1, (int)(values[0].length() - 2));
+    
+    // 是否是首个有效的field  
+    bool is_first_real_field = false;
+
+    for (int i = 1; i < worker->get_field_count(); i++)
+    {
+        std::string& name = (*vt_ttfi)[i].name;
+        enum tsdb_datatype_t datatype = (*vt_ttfi)[i].datatype;
+
+        switch (datatype)
+        {
+        case TSDB_DATATYPE_BOOL:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" != value) {
+                if (is_first_real_field) {
+                    ss << ",";
+                }
+                ss << name;
+                ss << "=";
+                if ("true" == value) {
+                    ss << "true";
+                }
+                else {
+                    ss << "false";
+                }
+                if (!is_first_real_field) {
+                    is_first_real_field = true;
+                }
+            }
+            break;
+        }
+        case TSDB_DATATYPE_INT:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" != value) {
+                if (is_first_real_field) {
+                    ss << ",";
+                }
+                ss << name;
+                ss << "=";
+                ss << value;
+                ss << "i";
+                if (!is_first_real_field) {
+                    is_first_real_field = true;
+                }
+            }
+            break;
+        }
+        case TSDB_DATATYPE_INT64:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" != value) {
+                if (is_first_real_field) {
+                    ss << ",";
+                }
+                ss << name;
+                ss << "=";
+                ss << value;
+                ss << "i";
+                if (!is_first_real_field) {
+                    is_first_real_field = true;
+                }
+            }
+
+            break;
+        }
+        case TSDB_DATATYPE_FLOAT:
+        case TSDB_DATATYPE_DOUBLE:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" != value) {
+                if (is_first_real_field) {
+                    ss << ",";
+                }
+                ss << name;
+                ss << "=";
+                ss << value;
+                if (!is_first_real_field) {
+                    is_first_real_field = true;
+                }
+            }
+
+            break;
+        }
+
+        case TSDB_DATATYPE_STRING:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" != value) {
+                if (is_first_real_field) {
+                    ss << ",";
+                }
+                ss << name;
+                ss << "=";
+                // 这个地方必须是双引号 单引号会报错  
+                ss << "\"";
+                ss << std::string(vt_values[i].ptr+1, vt_values[i].len-2);
+                ss << "\"";
+                //ss << value;
+                if (!is_first_real_field) {
+                    is_first_real_field = true;
+                }
+            }
+            break;
+        }
+        case TSDB_DATATYPE_DATETIME_MS:
+        {
+            std::string value = std::string(vt_values[i].ptr, vt_values[i].len);
+            if ("null" != value) {
+                if (is_first_real_field) {
+                    ss << ",";
+                }
+                ss << name;
+                ss << "=";
+                uint64_t valuell = p->tools->datetime_from_str(value.c_str() + 1, (int)(value.length() - 2));
+                ss << valuell;
+                ss << "000000";  // influxdb 默认时间单位为纳秒 valuell 为毫秒   
+                ss << "i";
+                if (!is_first_real_field) {
+                    is_first_real_field = true;
+                }
+            }
+
+            break;
+        }
+        case TSDB_DATATYPE_BINARY:
+        case TSDB_DATATYPE_POINTER:
+        case TSDB_DATATYPE_TAG_STRING:
+        case TSDB_DATATYPE_UNKNOWN:
+        default:
+            break;
+        }
+    }
+
+    ss << " ";
+    ss << (timell*(1000) * (1000)); // influxdb 默认时间单位为纳秒 valuell 为毫秒   
+
+    ss << "\n";
+
+    sql += ss.str();
+
+    return 0;
+}
+// 插入数据 仅仅是为了opentsdb  
+int insert_into_wrapper_for_opentsdb(rtdb::cJSON* root,  std::string& sql, thread_param_insert_table_general_t* param)
+{
+    int r = 0;
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    char* sql_for_opentsdb = rtdb::cJSON_PrintUnformatted(root);
+    if (NULL == sql_for_opentsdb) {
+        TSDB_ERROR(p, "[INSERT][worker_id:%d] cJSON_PrintUnformatted is NULL not support", param->thread_id);
+        param->exited = true;
+        return EINVAL;
+    }
+
+    r = param->conn->query_non_result(sql_for_opentsdb, strlen(sql_for_opentsdb));
+    if (0 != r) {
+        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][sql_size:%d] query_non_result failed",
+            param->thread_id, r, (int)strlen(sql_for_opentsdb));
+        return r;
+    }
+
+    if (sql_for_opentsdb) {
+        rtdb::cJSON_free(sql_for_opentsdb);
+        sql_for_opentsdb = NULL;
+    }
+
+    if (root) {
+        rtdb::cJSON_Delete(root);
+        root = NULL;
+    }
+
+    return 0;
+}
+
+
+void* insert_table_general_thread(void* _param)
 {
     thread_param_insert_table_general_t * param = (thread_param_insert_table_general_t *)_param;
 
@@ -123,13 +576,24 @@ void * insert_table_general_thread( void * _param )
     sql.reserve(param->sql_bytes + 8192);
     sql.resize(0);
 
-    if (DB_TIMESCALEDB != param->engine) {
+    if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
         sql = "insert into ";
     }
     else {
         sql = "";
     }
    
+    rtdb::cJSON* root = NULL;
+    if (DB_OPENTSDB == param->engine) {
+        root = rtdb::cJSON_CreateArray();
+        if (NULL == root) {
+            TSDB_ERROR(p, "[INSERT][worker_id:%d] cJSON_CreateArray is NULL not support", param->thread_id);
+            param->exited = true;
+            return NULL;
+        }
+        sql.resize(2); // []
+    }
+    
 
     while ( true ) {
 
@@ -143,7 +607,7 @@ void * insert_table_general_thread( void * _param )
             const std::string* names;
             const std::string* values;
             table_names_t* tables;
-            int r;
+            int r = 0;
 
 
             if (NULL == worker) {
@@ -168,50 +632,110 @@ void * insert_table_general_thread( void * _param )
 
             is_no_data_to_insert_table = false;
             for (size_t i = 0; i != tables->names.size(); ++i) {
-                if (DB_TIMESCALEDB == param->engine) {
-                    sql += "insert into ";
-                }
-                sql += tables->names[i];
-                sql += " ";
-                sql += "(";
-                sql += *names;
-                sql += " ";
-                sql += ") values (";
-                sql += *values;
-                sql += ")";
-                if (DB_TIMESCALEDB == param->engine) {
-                    sql += ";";
-                }
-                else {
-                    sql += " ";
-                }
-
-                line_count++;
-                insert_point += (worker->get_field_count()-1);  // 总的字段个数 - 主键  
-
-                if (sql.size() > param->sql_bytes) {
-                    if (DB_TIMESCALEDB != param->engine) {
-                        sql += ";";
-                    }
-                    param->r = insert_into_wrapper(param, sql);
+                if (DB_OPENTSDB == param->engine) {
+                    param->r = build_json_for_opentsdb(param, tables->names[i], worker, values, sql, root);
                     if (0 != param->r) {
-                        TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][sql_size:%d] insert_into_wrapper failed",  param->thread_id, r, (int)sql.size());
+                        TSDB_ERROR(p, "[INSERT][worker_id:%d][table:%s] build_json_for_opentsdb failed", 
+                            param->thread_id, tables->names[i].c_str());
                         param->exited = true;
                         return NULL;
                     }
-
-                    if (DB_TIMESCALEDB != param->engine) {
-                        sql = "insert into ";
+                }
+                else if(DB_INFLUXDB == param->engine)
+                {
+                    param->r = build_json_for_influxdb(param, tables->names[i], worker, values, sql);
+                    if (0 != param->r) {
+                        TSDB_ERROR(p, "[INSERT][worker_id:%d][table:%s] build_json_for_influxdb failed",
+                            param->thread_id, tables->names[i].c_str());
+                        param->exited = true;
+                        return NULL;
+                    }
+                }
+                else { // 非 OPENTSDB  
+                    if (DB_TIMESCALEDB == param->engine) {
+                        sql += "insert into ";
+                    }
+                    sql += tables->names[i];
+                    sql += " ";
+                    sql += "(";
+                    sql += *names;
+                    sql += " ";
+                    sql += ") values (";
+                    sql += *values;
+                    sql += ")";
+                    if (DB_TIMESCALEDB == param->engine) {
+                        sql += ";";
                     }
                     else {
-                        sql = "";
+                        sql += " ";
                     }
-                    param->insert_line_count += line_count;
-                    param->insert_point += insert_point;
-                    line_count = 0;
-                    insert_point = 0;
+                }
+                
+
+                line_count++;
+                if (DB_OPENTSDB == param->engine) {
+                    // open tsdb 最多MAX_OPENTSDB_FILES_COUNT(9)个字段  多了不支持  
+                    uint64_t real_field_count = (worker->get_field_count() >= MAX_OPENTSDB_FILES_COUNT ? MAX_OPENTSDB_FILES_COUNT : worker->get_field_count());
+                    insert_point += (real_field_count-1);  // 总的字段个数 - 主键  
+                }
+                else { // 非 opentsdb  
+                    insert_point += (worker->get_field_count()-1);  // 总的字段个数 - 主键  
+                }
+                
+                if (DB_OPENTSDB == param->engine) {
+                    if (sql.size() > param->sql_bytes) {
+                        param->r =  insert_into_wrapper_for_opentsdb(root, sql, param);
+                        if (0 != param->r) {
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][sql_size:%d] insert_into_wrapper_for_opentsdb failed", 
+                                param->thread_id, param->r, (int)sql.size());
+                            param->exited = true;
+                            return NULL;
+                        }
+
+                        root = rtdb::cJSON_CreateArray();
+                        if (NULL == root) {
+                            TSDB_ERROR(p, "[INSERT][worker_id:%d] cJSON_CreateArray is NULL not support", param->thread_id);
+                            param->exited = true;
+                            return NULL;
+                        }
+                        sql.resize(2);  // []
+
+                        param->insert_line_count += line_count;
+                        param->insert_point += insert_point;
+                        line_count = 0;
+                        insert_point = 0;
+                    }
                     
                 }
+                else { // 非DB_OPENTSDB  
+                    if (sql.size() > param->sql_bytes) {
+                        if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
+                            sql += ";";
+                        }
+                        param->r = insert_into_wrapper(param, sql);
+                        if (0 != param->r) {
+                            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][sql_size:%d] insert_into_wrapper failed", 
+                                param->thread_id, param->r, (int)sql.size());
+                            param->exited = true;
+                            return NULL;
+                        }
+
+                        if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
+                            sql = "insert into ";
+                        }
+                        else {
+                            sql = "";
+                        }
+
+                        param->insert_line_count += line_count;
+                        param->insert_point += insert_point;
+                        line_count = 0;
+                        insert_point = 0;
+                    }
+                }
+
+                
+                    
             } //  for (size_t i = 0; i != tables->names.size(); ++i) {
             
         } // for (size_t i = 0; i < vt_import_worker_t.size(); i++)
@@ -223,15 +747,29 @@ void * insert_table_general_thread( void * _param )
 
     if (line_count > 0) {
         if (!sql.empty()) {
-            if (DB_TIMESCALEDB != param->engine) {
+            if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
                 sql += ";";
             }
-            param->r = insert_into_wrapper(param, sql);
-            if (0 != param->r) {
-                TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d] insert_into_wrapper failed",  param->thread_id, param->r);
-                param->exited = true;
-                return NULL;
+            
+            if (DB_OPENTSDB == param->engine) {
+                param->r = insert_into_wrapper_for_opentsdb(root, sql, param);
+                if (0 != param->r) {
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][sql_size:%d] insert_into_wrapper_for_opentsdb failed", 
+                        param->thread_id, param->r, (int)sql.size());
+                    param->exited = true;
+                    return NULL;
+                }
             }
+            else { // 非 opentsdb 
+                param->r = insert_into_wrapper(param, sql);
+                if (0 != param->r) {
+                    TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d] insert_into_wrapper failed", param->thread_id, param->r);
+                    param->exited = true;
+                    return NULL;
+                }
+            }
+
+            
         }
         param->insert_line_count += line_count;
         param->insert_point += insert_point;
@@ -519,7 +1057,7 @@ int insert_table_general( int argc, char ** argv )
             if (it == map_test_table_file_info_t.end()) {
                 // 报错 无法找到表元信息   
                 r = ENOENT;
-                TSDB_ERROR(p, "[INSERT][table_lead=%s][index:%d] not found", (int)i, my_table_lead.c_str());
+                TSDB_ERROR(p, "[INSERT][table_lead=%s][index:%d] not found", my_table_lead.c_str(),  (int)i);
                 return r;
             }
             dsp.table_lead = my_table_lead;
@@ -580,6 +1118,24 @@ int insert_table_general( int argc, char ** argv )
         if (db_name.empty()) {
             TSDB_ERROR(p, "[INSERT]db_name empty");
             return EINVAL;
+        }
+
+        // 如果是influxdb 则顺便先创建数据 防止数据库未创建的情况  
+        if (DB_INFLUXDB == engine) {
+            wide_conn_t* conn = engine2->create_conn();
+            if (unlikely(NULL == conn)) {
+                TSDB_ERROR(p, "[CREATE][db=%s] create_conn failed", db_name.c_str());
+                return EFAULT;
+            }
+            r = conn->select_db(db_name.c_str());
+            if (unlikely(0 != r)) {
+                TSDB_ERROR(p, "[CREATE][db=%s][r=%d] create database failed", db_name.c_str(), r);
+                p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                conn->kill_me();
+                return r;
+            }
+            conn->kill_me();
+            conn = NULL;
         }
        
     }

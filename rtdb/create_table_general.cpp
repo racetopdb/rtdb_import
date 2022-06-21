@@ -258,6 +258,35 @@ static int build_create_table_sql_for_timescaledb(
     return r;
 }
 
+
+// 创建表的sql语句目前仅处理timescaledb  
+static int build_create_table_sql_for_opentsdb(
+    const std::string& table_name,
+    const std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t,
+    std::string& sql)
+{
+    int r = 0;
+
+    sql = "";
+
+    return r;
+}
+
+// 创建表的sql语句目前仅处理influxdb  
+static int build_create_table_sql_for_influxdb(
+    const std::string& table_name,
+    const std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t,
+    std::string& sql)
+{
+    int r = 0;
+
+    sql = "";
+
+    return r;
+}
+
+
+
 // 创建表的sql语句目前仅处理rtdb taos  
 static int build_create_table_sql(
     db_type_t engine,
@@ -283,6 +312,14 @@ static int build_create_table_sql(
     case rtdb::wide::DB_TIMESCALEDB:
     {
         return build_create_table_sql_for_timescaledb(table_name, vt_test_tb_field_info_t, sql);
+    }
+    case rtdb::wide::DB_OPENTSDB:
+    {
+        return build_create_table_sql_for_opentsdb(table_name, vt_test_tb_field_info_t, sql);
+    }
+    case rtdb::wide::DB_INFLUXDB:
+    {
+        return build_create_table_sql_for_influxdb(table_name, vt_test_tb_field_info_t, sql);
     }
     case rtdb::wide::DB_UNKNOWN:
     default:
@@ -351,7 +388,7 @@ void * create_table_general_thread( void * _param )
 
         std::vector<struct test_tb_field_info_t> & vt_test_tb_field_info_t = iter->second.vt_test_tb_field_info_t;
 
-        // 构建sql 语句 目前仅仅支持  rtdb, taos   
+        // 构建sql 语句 目前仅仅支持  rtdb, taos, timescale, opentsdb(这个啥也不做)   
         param->r = build_create_table_sql(param->engine, tlatn.table_name, vt_test_tb_field_info_t, sql);
         if (unlikely(0 != param->r)) {
             TSDB_ERROR(p, "[CREATE][thread_id=%d][table_name:%s][r=%d] build_create_table_sql failed",
@@ -359,13 +396,16 @@ void * create_table_general_thread( void * _param )
             break;
         }
 
-        // execute the SQL return value stored to param->r.
-        param->r = param->conn->query_non_result( sql.c_str(), sql.size() );
-        if ( unlikely( 0 != param->r ) ) {
-            TSDB_ERROR( p, "[CREATE][thread_id=%d][table_name:%s][r=%d] create table failed", 
-                param->thread_id, tlatn.table_name.c_str() , param->r );
-            p->tools->log_write_huge( __FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size() );
-            break;
+        // opentsdb 和 influxdb 不需要创建表  
+        if (DB_OPENTSDB != param->engine && DB_INFLUXDB != param->engine) {
+            // execute the SQL return value stored to param->r.
+            param->r = param->conn->query_non_result(sql.c_str(), sql.size());
+            if (unlikely(0 != param->r)) {
+                TSDB_ERROR(p, "[CREATE][thread_id=%d][table_name:%s][r=%d] create table failed",
+                    param->thread_id, tlatn.table_name.c_str(), param->r);
+                p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                break;
+            }
         }
     }
 
@@ -531,17 +571,37 @@ int create_table_general( int argc, char ** argv )
         }
         sql += ";";
 
-        // execute SQL to create database
-        r = conn->query_non_result( sql.c_str(), (int)sql.size() );
-        if ( unlikely( 0 != r ) ) {
-            TSDB_ERROR( p, "[CREATE][db=%s][r=%d] create database failed", db_name.c_str(), r );
-            p->tools->log_write_huge( __FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size() );
+        // influxdb 创建数据库语法怪异 无法使用query_non_result  
+        if (DB_INFLUXDB == engine) {
+            r = conn->select_db(db_name.c_str());
+            if (unlikely(0 != r)) {
+                TSDB_ERROR(p, "[CREATE][db=%s][r=%d] create database failed", db_name.c_str(), r);
+                p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                conn->kill_me();
+                return r;
+            }
             conn->kill_me();
-            return r;
+            conn = NULL;
         }
+        else { // 非 influxdb  
+            // open tsdb 上不需要创建数据库  
+            if (DB_OPENTSDB != engine) {
+                // execute SQL to create database
+                r = conn->query_non_result(sql.c_str(), (int)sql.size());
+                if (unlikely(0 != r)) {
+                    TSDB_ERROR(p, "[CREATE][db=%s][r=%d] create database failed", db_name.c_str(), r);
+                    p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
+                    conn->kill_me();
+                    return r;
+                }
+                conn->kill_me();
+                conn = NULL;
+            }
+        }
+        
+        
 
-        conn->kill_me();
-        conn = NULL;
+        
     }
 
     // prepare CREATE TABLE threads
