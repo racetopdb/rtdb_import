@@ -24,13 +24,17 @@ RTDB支持标准的SQL以及适配主流的时序数据库的操作规范，尽�
 * **7. 原生跨平台**
 一套代码无缝原生跨Linux、windows等多种操作系统；
 
-使用RTDB_IMPORT做为数据导入工具既可以往RTDB时序数据存储引擎完成时序数据的高效导入与查询，同时为了让大家对RTDB有更深入客观的了解，该项目也适配了TDEngine与Timescale的数据导入与查询操作。
+使用RTDB_IMPORT做为数据导入工具既可以往RTDB时序数据存储引擎完成时序数据的高效导入与查询，同时为了让大家对RTDB有更深入客观的了解，该项目也适配了InfluxDB、OpenTSDB、Timescale、TDEngine的数据导入与查询操作。
 
-关于TDEngine与Timescale请分别参阅：
+关于InfluxDB、OpenTSDB、Timescale、TDEngine请分别参阅：
 
-TDEngine ：https://github.com/taosdata/TDengine
+InfluxDB : https://github.com/influxdata/influxdb
 
-Timescale: https://github.com/timescale/timescaledb
+OpenTSDB : https://github.com/OpenTSDB/opentsdb
+
+Timescale : https://github.com/timescale/timescaledb
+
+TDEngine : https://github.com/taosdata/TDengine
 
 # Features
 - **支持的数据类型**
@@ -96,9 +100,12 @@ gps_vehicle_speed float
   |  RTDB       | Windows32位  | tsdb.dll              | RTDB数据库的32位Windows客户端接口库 |
   |             | Windows64位  | tsdb.dll              | RTDB数据库的64位Windows客户端接口库 |
   |             | Linux 64位   | libtsdb.so            | RTDB数据库的64位Linux客户端接口库   |
-  |  TDEngine   | Windows32位  | taos.dll              | TDEngine数据库的32位Windows客户端接口库 |
-  |             | Windows64位  | taos.dll              | TDEngine数据库的64位Windows客户端接口库 |
-  |             | Linux 64位   | libtaos.so.1          | TDEngine数据库的64位Linux客户端接口库   |
+  |  InfluxDB   | Windows32位  |                       |                                       |
+  |             | Windows64位  |                       |                                       |
+  |             | Linux 64位   |                       |                                       |
+  |  OpenTSDB   | Windows32位  |                       |                                       |
+  |             | Windows64位  |                       |                                       |
+  |             | Linux 64位   |                       |                                       |
   |  TimeScale  | Windows64位  | libcrypto-1_1-x64.dll |                                     |
   |             |              | libiconv-2.dll        |                                     |
   |             |              | libintl-9.dll         |                                     |
@@ -107,6 +114,10 @@ gps_vehicle_speed float
   |             |              | libssl-1_1-x64.dll    |                                     |
   |             |              | libwinpthread-1.dll   |                                     |
   |             | Linux 64位   | libpq.so              |                                     |
+  |  TDEngine   | Windows32位  | taos.dll              | TDEngine数据库的32位Windows客户端接口库 |
+  |             | Windows64位  | taos.dll              | TDEngine数据库的64位Windows客户端接口库 |
+  |             | Linux 64位   | libtaos.so.1          | TDEngine数据库的64位Linux客户端接口库   |
+  
 
 
 RTDB 数据库客户端接口是动态装载的，所以对运行环境没有任何要求。
