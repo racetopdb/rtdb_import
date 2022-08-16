@@ -1,3 +1,4 @@
+#include <sstream>
 #include "wide_base.h"
 #include "utils.h"
 #include "file_operation.h"
@@ -10,14 +11,12 @@
 #include <assert.h>
 #include <string>
 #include <map>
-#include <sstream>
+
 
 
 
 #define INSERT_USE_TIMESTAMP    1
 #define ENABLE_WRITE_INSERT_SQL 0
-// 默认CSV文件分割符号  
-#define DEFAULT_CSV_FILE_SEP "\t"
 
 
 // 忽略opentsdb null  
@@ -71,7 +70,7 @@ static int insert_into_wrapper(void* _param, const std::string& sql)
 
     // execute the SQL return value stored to param->r.
     r = param->conn->query_non_result(sql.c_str(), sql.size());
-    if (unlikely(0 != param->r)) {
+    if (unlikely(0 != r)) {
         TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d][sql_size:%d] insert table failed",  param->thread_id, r, (int)sql.size());
         p->tools->log_write_huge(__FILE__, __LINE__, __FUNCTION__, LOG_INF, TRUE, sql.c_str(), sql.size());
         return r;
@@ -527,7 +526,33 @@ int insert_into_wrapper_for_opentsdb(rtdb::cJSON* root,  std::string& sql, threa
     return 0;
 }
 
-
+/*
+* 注意：这个是clickhouse插入多条语句的注意事项：  
+* 例如  
+* insert into table_1 (time, field) values('2020-01-01 00:00:00.000', 1);insert into table_1 (time, field) values('2020-01-01 00:00:00.000', 1);  
+* 这种语句在clickhouse中不能支持的，仅插入一条，目前开发人员查看了clickhouse的源码 确认是不支持的。  
+* 理由如下：  
+* 1、服务器不支持多SQL语句：  
+* 服务器端通过 ValuesBlockInputFormat::parseExpression 解析客户端发上来的 SQL 语句。  
+* 最终调用到 ParserInsertQuery::parseImpl 解析 Insert 语句。  
+* 里面遇到 ; 则被认为是查询停止符号，所以服务器是不支持多条 SQL 语句的。  
+* 
+* 2、客户端只有命令行工具支持多SQL语句：  
+* 
+* 如果命令行参数有 -multiquery 参数，则通过 ClientBase::executeMultiQuery 函数执行多条写入的逻辑。  
+* 该函数调用 ClientBase::parseQuery 函数解析 SQL，最终解析SQL的代码是：ParserInsertQuery::parseImpl 函数。  
+* 该函数的一部分代码如下：  
+*        /// If format name is followed by ';' (end of query symbol) there is no data to insert.
+*        if (data < end && *data == ';')
+*            throw Exception("You have excessive ';' symbol before data for INSERT.\n"
+*                                    "Example:\n\n"
+*                                    "INSERT INTO t (x, y) FORMAT TabSeparated\n"
+*                                    ";\tHello\n"
+*                                    "2\tWorld\n"
+*                                    "\n"
+*                                    "Note that there is no ';' just after format name, "
+*                                    "you need to put at least one whitespace symbol before the data.", ErrorCodes::SYNTAX_ERROR);
+*/
 void* insert_table_general_thread(void* _param)
 {
     thread_param_insert_table_general_t * param = (thread_param_insert_table_general_t *)_param;
@@ -573,10 +598,10 @@ void* insert_table_general_thread(void* _param)
     int line_count = 0; 
     uint64_t insert_point = 0;
     std::string sql;
-    sql.reserve(param->sql_bytes + 8192);
+    sql.reserve(param->sql_bytes + DEFAULT_BUFFER_BYTES);
     sql.resize(0);
 
-    if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
+    if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine && DB_CLICKHOUSE != param->engine) {
         sql = "insert into ";
     }
     else {
@@ -594,6 +619,19 @@ void* insert_table_general_thread(void* _param)
         sql.resize(2); // []
     }
     
+#if 0  // 这个尝试了不起作用  故废弃  
+    //如果是clickhouse 允许重复插入数据  
+    if (DB_CLICKHOUSE == param->engine) {
+        const char* set_insert_deduplicate = "SET insert_deduplicate=0;";
+        // execute the SQL return value stored to param->r.
+        param->r = param->conn->query_non_result(set_insert_deduplicate, strlen(set_insert_deduplicate));
+        if (unlikely(0 != param->r)) {
+            TSDB_ERROR(p, "[INSERT][thread_id=%d][r=%d]SET insert_deduplicate failed", 
+                param->thread_id, param->r);
+            return NULL;
+        }
+    }
+#endif
 
     while ( true ) {
 
@@ -616,6 +654,12 @@ void* insert_table_general_thread(void* _param)
 
             r = worker->read(names, values, tables);
             if (ENODATA == r) {
+                continue;
+            }
+
+            // 如果是时间格式出错 则选择忽略此行数据  
+            if (EINVALMAYEIGNORE == r) {
+                is_no_data_to_insert_table = false;
                 continue;
             }
 
@@ -652,7 +696,7 @@ void* insert_table_general_thread(void* _param)
                     }
                 }
                 else { // 非 OPENTSDB  
-                    if (DB_TIMESCALEDB == param->engine) {
+                    if (DB_TIMESCALEDB == param->engine || DB_CLICKHOUSE == param->engine) {
                         sql += "insert into ";
                     }
                     sql += tables->names[i];
@@ -663,7 +707,7 @@ void* insert_table_general_thread(void* _param)
                     sql += ") values (";
                     sql += *values;
                     sql += ")";
-                    if (DB_TIMESCALEDB == param->engine) {
+                    if (DB_TIMESCALEDB == param->engine || DB_CLICKHOUSE == param->engine) {
                         sql += ";";
                     }
                     else {
@@ -709,7 +753,7 @@ void* insert_table_general_thread(void* _param)
                 }
                 else { // 非DB_OPENTSDB  
                     if (sql.size() > param->sql_bytes) {
-                        if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
+                        if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine && DB_CLICKHOUSE != param->engine) {
                             sql += ";";
                         }
                         param->r = insert_into_wrapper(param, sql);
@@ -720,7 +764,7 @@ void* insert_table_general_thread(void* _param)
                             return NULL;
                         }
 
-                        if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
+                        if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine && DB_CLICKHOUSE != param->engine) {
                             sql = "insert into ";
                         }
                         else {
@@ -747,7 +791,7 @@ void* insert_table_general_thread(void* _param)
 
     if (line_count > 0) {
         if (!sql.empty()) {
-            if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine) {
+            if (DB_TIMESCALEDB != param->engine && DB_INFLUXDB != param->engine && DB_CLICKHOUSE != param->engine) {
                 sql += ";";
             }
             
@@ -987,7 +1031,7 @@ int insert_table_general( int argc, char ** argv )
 
 
 
-    std::map < std::string, std::vector<std::string> > map_vt_table_head_data_path;
+    std::map < std::string, CONFIG_DATA_PATHS_SEP_T > map_vt_table_head_data_path;
     //std::vector<struct table_lead_and_table_path_t> vt_table_lead_and_table_path_t;
 
     // 如果路径不为空  则执行  
@@ -1043,14 +1087,14 @@ int insert_table_general( int argc, char ** argv )
 
         vt_import_source_t.resize(map_vt_table_head_data_path.size());
         vt_dir_source_param_t.resize(map_vt_table_head_data_path.size());
-        std::map < std::string, std::vector<std::string> >::iterator iter = map_vt_table_head_data_path.begin();
+        std::map < std::string, CONFIG_DATA_PATHS_SEP_T >::iterator iter = map_vt_table_head_data_path.begin();
 
         size_t i = 0;
         for (; iter != map_vt_table_head_data_path.end(); ++iter, i++) {
 
             struct dir_source_param_t dsp;
             std::string my_table_lead = iter->first;
-            std::vector<std::string>& file_paths = iter->second;
+            std::vector<std::string>& file_paths = iter->second.first;  // 路径列表  
 
             std::map<std::string, struct test_table_file_info_t>::iterator it = 
                 map_test_table_file_info_t.find(my_table_lead);
@@ -1063,6 +1107,8 @@ int insert_table_general( int argc, char ** argv )
             dsp.table_lead = my_table_lead;
             dsp.vt_dirs = file_paths;
             dsp.ttfi = &it->second;
+            // 分隔符号 赋值  
+            dsp.sep = iter->second.second;
             vt_dir_source_param_t[i] = dsp;
             vt_import_source_t[i] = new dir_source_t();
             r = vt_import_source_t[i]->open(thread_count, &vt_dir_source_param_t[i]);
@@ -1140,6 +1186,19 @@ int insert_table_general( int argc, char ** argv )
        
     }
 
+    const char* sep = NULL;
+    p->tools->find_argv(argc, argv, "sep", &sep, NULL);
+    if (NULL == sep || '\0' == *sep) {
+        sep = DEFAULT_CSV_FILE_SEP;
+    }
+
+    std::string sep_after;
+
+    // 分隔符号比较特殊 需要整理下  
+    tidy_separate_symbol(sep, sep_after);
+
+    TSDB_INFO(p, "[GENERATE][PARAMETERS][sep_after          =%s]", sep_after.c_str());
+
     // prepare INSERT into TABLE threads
 
     std::vector< thread_param_insert_table_general_t >   threads;
@@ -1178,6 +1237,7 @@ int insert_table_general( int argc, char ** argv )
         //item.vt_insert_table_runtime_info_t = &vt_insert_table_runtime_info_t;
         item.vt_import_source_t = &vt_import_source_t;
         item.insert_point = 0;
+        item.sep = sep_after;
     }
 
     // start INSERT into TABLE threads

@@ -36,6 +36,8 @@ Timescale : https://github.com/timescale/timescaledb
 
 TDEngine : https://github.com/taosdata/TDengine
 
+ClichHouse : https://github.com/ClickHouse/ClickHouse
+
 # Features
 - **支持的数据类型**
 下表所示RTDB支持的数据类型。其中，“**数据类型及别名**”列中所示的内容都可以在SQL语句中使用。我们在SQL99标准以外，支持更多的数据类型别名，是为了与更广泛的与其它数据库兼容。
@@ -85,7 +87,7 @@ gps_latitude float
 gps_vehicle_speed float
 ```
 - **支持文本数据与csv数据的导入**
-不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：空格“ ”、逗号“，”、顿号“、”。
+不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：table键、逗号。
 
 - **支持模拟数据的导入**
 如果在配置中没有指定需要导入的数据文件，系统会智能匹配表结构模板中的数据类型，随机生成数据，执行数据导入。
@@ -117,6 +119,18 @@ gps_vehicle_speed float
   |  TDEngine   | Windows32位  | taos.dll              | TDEngine数据库的32位Windows客户端接口库 |
   |             | Windows64位  | taos.dll              | TDEngine数据库的64位Windows客户端接口库 |
   |             | Linux 64位   | libtaos.so.1          | TDEngine数据库的64位Linux客户端接口库   |
+  |             | Linux 64位   | libpq.so              |                                     |
+  |  ClichHouse | Windows64位  | absl-lib.lib          | Clickhouse数据库的64位Windows客户端接口库 |
+  |             |              | cityhash-lib.lib      | Clickhouse数据库的64位Windows客户端接口库 |
+  |             |              | clickhouse-cpp-lib.dll| Clickhouse数据库的64位Windows客户端接口库 |
+  |             |              | clickhouse-cpp-lib-static.lib| Clickhouse数据库的64位Windows客户端接口库 |
+  |             |              | lz4-lib.lib           | Clickhouse数据库的64位Windows客户端接口库 |
+  |             | Linux 64位   | libabsl-lib.a         | Clickhouse数据库的64位Linux客户端接口库 |
+  |             |              | libcityhash-lib.a     | Clickhouse数据库的64位Linux客户端接口库 |
+  |             |              | libclickhouse-cpp-lib.so |Clickhouse数据库的64位Linux客户端接口库 |
+  |             |              | libclickhouse-cpp-lib-static.a |Clickhouse数据库的64位Linux客户端接口库|
+  |             |              | liblz4-lib.a          |Clickhouse数据库的64位Linux客户端接口库|
+
   
 
 
@@ -126,20 +140,23 @@ TAOS 数据库客户端接口只能通过 -ltaos 编译选项连接，所以要�
 
 **编译器配置**
 
-> windows vs2010
+> windows vs2010、vs2019(c++17)
 
-> linux，gcc
+> linux，gcc(c++98, c++17) 推荐gcc-9.3.1版本及以上 
 
 ## Build
 - **windows**
 
-> 执行rtdb_import.sln完成编译
+> 执行rtdb_import_vs2010.sln、rtdb_import_vs2019.sln完成编译
 
 - **linux**
 
 > cd make
 
-> 执行 sh build.sh
+> 执行 sh build_17.sh、sh build_98.sh
+
+- **注意**
+> 如果使用ClickHouse 必须启用 c++17才可以(rtdb_import_vs2019.sln, sh build_17.sh)
 
 ## Installation
 
@@ -155,7 +172,7 @@ Timescale 数据库服务安装请参考：(https://github.com/timescale/timesca
 
 TDengine 数据库服务安装请参考：(https://github.com/taosdata/TDengine)
 
-
+ClichHouse 数据库服务安装请参考: (https://github.com/ClickHouse/ClickHouse)
 
 ## Usage
 ### 1、创建表
@@ -197,10 +214,10 @@ TDengine 数据库服务安装请参考：(https://github.com/taosdata/TDengine)
 通过以下命令导入数据。
 *注：如果命令中不指定path参数，也就是不指定数据源，系统会根据表结构中字段的数据类型，模拟生成数据。*
 #### windows平台（import_data.bat）
-> call "rtdb_import.exe" -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  /start_time '2020-01-01' -step_time 1000  -sql_size 128k -path data\general_data.conf -format csv -db DB_TEST_WRITE -table_conf data\general_table.conf
+> call "rtdb_import.exe" -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  /start_time '2020-01-01' -step_time 1000  -sql_size 128k -path data\general_data.conf -format csv -db DB_TEST_WRITE -table_conf data\general_table.conf -sep "\t"
 
 #### linux平台（import_data.sh）
-> ./rtdb_import -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 40 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000  -stop_time 1h -sql_size 128k -path data/general_data.conf -format csv  -db DB_TEST_WRITE -table_conf data/general_table.conf
+> ./rtdb_import -insert.table.general -engine rtdb -server 192.168.1.43:1234 -thread 40 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000  -stop_time 1h -sql_size 128k -path data/general_data.conf -format csv  -db DB_TEST_WRITE -table_conf data/general_table.conf -sep "\t"
 
 ### 导入数据参数解释
 
@@ -220,7 +237,7 @@ TDengine 数据库服务安装请参考：(https://github.com/taosdata/TDengine)
   | format                | 导入数据文件的格式        | 目前支持txt与csv                          |
   | db                    | 数据库名称           |                                      |
   | table_conf            | 表的结构模板文件      |                                      |
-   
+  | sep                   | 分隔符号 默认 table 分隔  |  目前仅仅支持 table键和逗号 可以联合使用 例如 -sep '\t' -sep ',' -sep '\t,' |
 ### general_data.conf  导入数据的配置说明
 
 > TABLE_	data/general_std.txt.data
@@ -231,7 +248,7 @@ TDengine 数据库服务安装请参考：(https://github.com/taosdata/TDengine)
   
   
 ### general_std.txt.data  导入数据源格式说明
-不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：空格“ ”、逗号“，”、顿号“、”。
+不论是文本结构还是csv结构，文件的第一行是字段名称，之后才能是数据。字段名称必须要与表结构模板申明中的字段名保持一致。如此系统会根据数据文件中的字段名称匹配上表结构关于字段类型的描述。列与列之间的分隔符可以是：table键、逗号。
 
 > FIELD_0	FIELD_1	FIELD_2	FIELD_3	FIELD_4	FIELD_5	FIELD_6	FIELD_7	FIELD_8	FIELD_9	FIELD_10	FIELD_11	FIELD_12	FIELD_13
 > false	0	0	0.23	0.23	'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx32'	'2020-01-01 00:00:00.000'	false	0	0	0.23	0.23	'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx64'	'2020-01-01 00:00:00.000'

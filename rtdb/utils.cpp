@@ -1,7 +1,8 @@
+#include <sstream>
 #include "utils.h"
 #include "dpr_stdinc.h"
 #include <set>
-#include <sstream>
+
 
 
 using namespace rtdb::wide;
@@ -813,6 +814,12 @@ static int do_parse_table_conf_file_step_1(
 
         int count = 0;
         p->tools->to_const_array(cs.ptr, (int)cs.len, "\t", 1, NULL, &count);
+        if (5 != count) {
+            std::string s(cs.ptr, cs.len);
+            TSDB_ERROR(p, "table_conf_file format error. [%s] ", s.c_str());
+            TSDB_ERROR(p, "table_conf_file format error. like table_lead \\t primary_key_field_name \\t table_tail_field_name \\t table_tail_list \\t file_path");
+            return EINVAL;
+        }
         
 
         std::vector<tsdb_str> vt_tsdb_str_table_in_one_line;
@@ -821,13 +828,19 @@ static int do_parse_table_conf_file_step_1(
         {
             vt_tsdb_str_table_in_one_line.resize(count);
         }
-        catch (const std::exception&)
+        catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
 
         p->tools->to_const_array(cs.ptr, (int)cs.len, "\t", 1, &vt_tsdb_str_table_in_one_line[0], &count);
+        if (5 != count) {
+            std::string s(cs.ptr, cs.len);
+            TSDB_ERROR(p, "table_conf_file format error. [%s] ", s.c_str());
+            TSDB_ERROR(p, "table_conf_file format error. like table_lead \\t primary_key_field_name \\t table_tail_field_name \\t table_tail_list \\t file_path");
+            return EINVAL;
+        }
         
         try
         {
@@ -836,7 +849,7 @@ static int do_parse_table_conf_file_step_1(
         }
         catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
     }
@@ -984,6 +997,14 @@ static int do_parse_table_conf_file_step_2(
 
         test_table_file_info.index = (int)i;
 
+        // 冗余检查 vt_tsdb_str 不等于5 证明上一步 do_parse_table_conf_file_step_1 解析文件格式有问题   
+        // 像是这样 # table_lead  primary_key_field_name  table_tail_field_name   table_tail_list  file_path  
+        // #location_           A,  D,  E,  F   ./general_location.txt  
+        if (5 != vt_tsdb_str.size()) {
+            TSDB_ERROR(p, "vt_tsdb_str must be 5 but now [%d]", (int)vt_tsdb_str.size());
+            return EINVAL;
+        }
+
         // 表名前缀  
         try
         {
@@ -991,7 +1012,7 @@ static int do_parse_table_conf_file_step_2(
         }
         catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", vt_tsdb_str[0].len);
             return ENOMEM;
         }
 
@@ -1000,9 +1021,9 @@ static int do_parse_table_conf_file_step_2(
             // 主键字段名字 可以为空  
             test_table_file_info.primary_key_field_name.assign(vt_tsdb_str[1].ptr, (int)vt_tsdb_str[1].len);
         }
-        catch (const std::exception&)
+        catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", vt_tsdb_str[1].len);
             return ENOMEM;
         }
         
@@ -1013,7 +1034,7 @@ static int do_parse_table_conf_file_step_2(
         }
         catch (const std::exception&)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", vt_tsdb_str[2].len);
             return ENOMEM;
         }
 
@@ -1031,9 +1052,9 @@ static int do_parse_table_conf_file_step_2(
         {
             vt_tsdb_table_tail.resize(count);
         }
-        catch (const std::exception&)
+        catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
         
@@ -1048,7 +1069,7 @@ static int do_parse_table_conf_file_step_2(
         }
         catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
 
@@ -1184,6 +1205,15 @@ static int do_parse_table_data_conf_file_step_1(
 
         int count = 0;
         p->tools->to_const_array(cs.ptr, (int)cs.len, "\t", 1, NULL, &count);
+        // count 允许为 2 或者 3  
+        //       2 ：表名前缀和文件列表  
+        //       3 ：表名前缀和文件列表和分隔符号  
+        if (count < 2) {
+            std::string s(cs.ptr, cs.len);
+            TSDB_ERROR(p, "table_data_conf_file format error. [%s] ", s.c_str());
+            TSDB_ERROR(p, "table_data_conf_file format error. like table_lead \\t data_path_list");
+            return EINVAL;
+        }
         
 
         std::vector<tsdb_str> vt_tsdb_str_table_in_one_line;
@@ -1192,14 +1222,23 @@ static int do_parse_table_data_conf_file_step_1(
         {
             vt_tsdb_str_table_in_one_line.resize(count);
         }
-        catch (const std::exception&)
+        catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
 
         p->tools->to_const_array(cs.ptr, (int)cs.len, "\t", 1, &vt_tsdb_str_table_in_one_line[0], &count);
-        
+        // count 允许为 2 或者 3  
+        //       2 ：表名前缀和文件列表  
+        //       3 ：表名前缀和文件列表和分隔符号  
+        if (count < 2) {
+            std::string s(cs.ptr, cs.len);
+            TSDB_ERROR(p, "table_data_conf_file format error. [%s] ", s.c_str());
+            TSDB_ERROR(p, "table_data_conf_file format error. like table_lead \\t data_path_list");
+            return EINVAL;
+        }
+
         try
         {
             vt_tsdb_str_table_in_one_line.resize(count);
@@ -1207,7 +1246,7 @@ static int do_parse_table_data_conf_file_step_1(
         }
         catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
     }
@@ -1220,12 +1259,12 @@ static int do_parse_table_data_conf_file_step_1(
 /**
  * @brief  将表列表文件第二次提取 每个单元是表名前缀和数据文件路径列表 注意 ： 数据文件路径列表之间使用逗号分割   
  * @param[in]  std::vector<std::vector<tsdb_str> >& vt_tsdb_str_fields 每个表信息 vector  
- * @param[out] std::map < std::string, std::vector<std::string> >& map_vt_table_head_data_path  表名前缀及文件位置映射关系  
+ * @param[out] std::map <std::string, CONFIG_DATA_PATHS_SEP_T>& map_vt_table_head_data_path  表名前缀及文件位置映射关系  
  * @return 0 成功 其他 失败    
  */
 static int do_parse_table_data_conf_file_step_2(
     const std::vector<std::vector<tsdb_str> >& vt_tsdb_str_table_line,
-    std::map < std::string, std::vector<std::string> >& map_vt_table_head_data_path)
+    std::map <std::string, CONFIG_DATA_PATHS_SEP_T>& map_vt_table_head_data_path)
 {
     int r = 0;
     std::set<std::string> set_field_name;
@@ -1242,15 +1281,17 @@ static int do_parse_table_data_conf_file_step_2(
         const std::vector<tsdb_str>& vt_tsdb_str = vt_tsdb_str_table_line[i];
         std::string table_lead;
         std::vector<std::string> vt_table_data_path;
+        std::string sep;
+        std::string sep_after;
 
 
-        // 冗余检查 vt_tsdb_str必须大于或者等于2 否则 直接报错  
+        // 冗余检查 vt_tsdb_str小于2 直接报错  
         if (vt_tsdb_str.size() < (size_t)2) {
             std::string s;
             if (vt_tsdb_str.size() == 1) {
                 s.assign(vt_tsdb_str[0].ptr, vt_tsdb_str[0].len);
             }
-            TSDB_ERROR(p, "[index:%d][num:%d][string:%s] at least 2", (int)i, (int)vt_tsdb_str.size(), s.c_str());
+            TSDB_ERROR(p, "[index:%d][num:%d][string:%s] must be 2", (int)i, (int)vt_tsdb_str.size(), s.c_str());
             return EINVAL;
         }
 
@@ -1261,7 +1302,7 @@ static int do_parse_table_data_conf_file_step_2(
         }
         catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", vt_tsdb_str[0].len);
             return ENOMEM;
         }
 
@@ -1276,9 +1317,9 @@ static int do_parse_table_data_conf_file_step_2(
         {
             vt_tsdb_table_data.resize(count);
         }
-        catch (const std::exception&)
+        catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
         
@@ -1293,7 +1334,7 @@ static int do_parse_table_data_conf_file_step_2(
         }
         catch (...)
         {
-            TSDB_ERROR(p, "bad alloc");
+            TSDB_ERROR(p, "bad alloc : %d", count);
             return ENOMEM;
         }
 
@@ -1309,14 +1350,60 @@ static int do_parse_table_data_conf_file_step_2(
             }
             catch (...)
             {
-                TSDB_ERROR(p, "bad alloc");
+                TSDB_ERROR(p, "bad alloc : %d", vt_tsdb_table_data[i].len);
                 return ENOMEM;
+            }
+        }
+
+        // 如果有分隔符号则尝试赋值 没有则忽略  
+        if (vt_tsdb_str.size() >= (size_t)3) {
+            // 分隔符号  
+            try
+            {
+                sep.assign(vt_tsdb_str[2].ptr, vt_tsdb_str[2].len);
+            }
+            catch (...)
+            {
+                TSDB_ERROR(p, "bad alloc : %d", vt_tsdb_str[2].len);
+                return ENOMEM;
+            }
+
+           
+            // 去除头尾空格  
+            if (!sep.empty())
+            {
+                sep.erase(0, sep.find_first_not_of(" "));
+                sep.erase(sep.find_last_not_of(" ") + 1);
+            }
+
+            // 去除头尾单引号  
+            if (!sep.empty())
+            {
+                // 目前无错误返回 忽略返回值检查  
+                trim_first_and_last_char_only_once(sep, '\'', sep_after);
+                sep = sep_after;
+            }
+            
+            // 去除头尾双引号  
+            if (!sep.empty())
+            {
+                // 目前无错误返回 忽略返回值检查  
+                trim_first_and_last_char_only_once(sep, '\"', sep_after);
+                sep = sep_after;
+            }
+
+            sep_after.resize(0);
+            // 将分隔符号整理下  
+            r = tidy_separate_symbol(sep.c_str(), sep_after);
+            if (0 != r) {
+                TSDB_ERROR(p, "[%s] tidy_separate_symbol failed", sep.c_str());
+                return r;
             }
         }
 
         try
         {
-            map_vt_table_head_data_path.insert(std::make_pair(table_lead, vt_table_data_path));
+            map_vt_table_head_data_path.insert(std::make_pair(table_lead, std::make_pair(vt_table_data_path, sep_after)));
         }
         catch (...)
         {
@@ -1443,14 +1530,14 @@ int rtdb::wide::convert_table_conf_map_to_table_vector_ex(
 /**
  * @brief  解析表数据文件  
  * @param[in]  const char* table_data_conf_file                                           表数据配置文件路径  
- * @param[out] std::map < std::string,  std::vector<std::string> > & map_vt_table_head_data_path 表数据信息数组  
+ * @param[out] std::map < std::string,  CONFIG_DATA_PATHS_SEP_T> > & map_vt_table_head_data_path 表数据信息数组  
  *             key : 表名前缀  
  *             value : 数据文件列表  
  * @return  0 成功 其他 失败  
  */
 int rtdb::wide::parse_table_data_conf_file(
     const char* table_data_conf_file,
-    std::map < std::string, std::vector<std::string> >& map_vt_table_head_data_path)
+    std::map <std::string, CONFIG_DATA_PATHS_SEP_T>& map_vt_table_head_data_path)
 {
     int r = 0;
 
@@ -1490,14 +1577,14 @@ int rtdb::wide::parse_table_data_conf_file(
 
 /**
  * @brief  将表数据信息转化vector格式 目的是为了便于将表数据发送到各个线程中  
- * @param[in] std::map < std::string,  std::vector<std::string> > & map_vt_table_head_data_path 表数据信息数组  
+ * @param[in] std::map < std::string,  CONFIG_DATA_PATHS_SEP_T > & map_vt_table_head_data_path 表数据信息数组  
  *             key : 表名前缀  
- *             value : 数据文件列表  
+ *             value : 数据文件列表 和 分隔符号  
  * @param[out]  std::vector<struct table_lead_and_table_path_t> &vt_table_lead_and_table_name_t  表名信息vector形式  
  * @return  0 成功 其他 失败  
  */
 int rtdb::wide::convert_table_data_map_to_table_vector(
-    const std::map < std::string, std::vector<std::string> >& map_vt_table_head_data_path,
+    const std::map < std::string, CONFIG_DATA_PATHS_SEP_T >& map_vt_table_head_data_path,
     std::vector<struct table_lead_and_table_path_t>& vt_table_lead_and_table_path_t)
 {
     int r = 0;
@@ -1515,12 +1602,12 @@ int rtdb::wide::convert_table_data_map_to_table_vector(
         return ENOMEM;
     }
 
-    std::map < std::string, std::vector<std::string> >::const_iterator iter = map_vt_table_head_data_path.begin();
+    std::map < std::string, CONFIG_DATA_PATHS_SEP_T >::const_iterator iter = map_vt_table_head_data_path.begin();
 
     for (; iter != map_vt_table_head_data_path.end(); ++iter)
     {
         const std::string& table_lead = iter->first;
-        const std::vector<std::string> &vt_table_data_path = iter->second;
+        const std::vector<std::string> &vt_table_data_path = iter->second.first;
 
         struct rtdb::wide::table_lead_and_table_path_t tlatp;
 
@@ -1555,41 +1642,58 @@ int rtdb::wide::convert_table_data_map_to_table_vector(
  * @param[in]   const char* sep                         csv 分隔符号  
  * @param[out]  std::vector<tsdb_str>& vt_data,         格式好的数据  
  * @param[out]  std::vector<BOOL>& vt_data_is_string    指示是否是字符串类型  
+ * @param[out]  int *line_no                            行号  
  * @return  0 成功 ENODATA 表示已经读到文件尾部了 其他情况失败  
  */
 int rtdb::wide::get_format_line_from_csv_file(
     file_operation& fo,
     const char* sep,
     std::vector<tsdb_str>& vt_data,
-    std::vector<BOOL>& vt_data_is_string)
+    std::vector<BOOL>& vt_data_is_string, 
+    int *line_no)
 {
     int r = 0;
 
     tsdb_v3_t* p = rtdb_tls();
     assert(p);
 
-    char line[8192] = { 0 };
-    int data_len = fo.read_one_line(line, (unsigned int)sizeof(line));
-    if (data_len <= 0) {
-        if (0 == data_len) {
-            // 没有数据了 正常返回   
-            return ENODATA;
+    char line[DEFAULT_BUFFER_BYTES] = { 0 };
+
+    // 增加过滤掉空行  
+    while (true)
+    {
+        memset(line, 0x00, sizeof(line));
+        int data_len = fo.read_one_line(line, (unsigned int)sizeof(line));
+        if (data_len <= 0) {
+            if (0 == data_len) {
+                // 没有数据了 正常返回   
+                return ENODATA;
+            }
+            // 出错了  
+            TSDB_ERROR(p, "read_one_line failed");
+            r = EFAULT;
+            return r;
         }
-        // 出错了  
-        TSDB_ERROR(p, "read_one_line failed");
-        r = EFAULT;
-        return r;
-    }
 
 
-    data_len = (int)strlen(line);
-    if (data_len >= 2 && '\r' == line[data_len - 2]) {
-        line[data_len - 2] = '\0';
-        data_len -= 2;
-    }
-    else if (data_len >= 1 && ('\r' == line[data_len - 1] || '\n' == line[data_len - 1])) {
-        line[data_len - 1] = '\0';
-        data_len -= 1;
+        data_len = (int)strlen(line);
+        if (data_len >= 2 && '\r' == line[data_len - 2]) {
+            line[data_len - 2] = '\0';
+            data_len -= 2;
+        }
+        else if (data_len >= 1 && ('\r' == line[data_len - 1] || '\n' == line[data_len - 1])) {
+            line[data_len - 1] = '\0';
+            data_len -= 1;
+        }
+
+        // 再次判断此行是否为空  如果为空则直接结束  
+        if (0 == data_len) {
+            if (NULL != line_no) {
+                (*line_no)++;
+            }
+            continue;
+        }
+        break;
     }
 
     int data_count = 0;
@@ -1844,8 +1948,6 @@ int rtdb::wide::generate_field_for_one_line(
  * @return   0 成功 其他 错误  
  */
 int rtdb::wide::generate_data_for_one_line(std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
-    std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t, int start_index, const char* sep, std::string &line);
-int rtdb::wide::generate_data_for_one_line(std::vector <struct field_increase_store_t>& vt_field_increase_store_t,
     std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t, int start_index,  const char* sep, std::string& line)
 {
     int r = 0;
@@ -2038,7 +2140,7 @@ int rtdb::wide::add_add_single_quotes_for_string_and_timestamp(
                 BOOL b = p->tools->datetime_to_str(time_ms, time_s, &time_sl);
                 if (!b) {
                     r = EINVAL;
-                    TSDB_ERROR(p, "[r=%d][time_s:%s][time_ms:%lld] convert time failed", 
+                    TSDB_INFO(p, "[r=%d][time_s:%s][time_ms:%lld] Warning : convert time failed", 
                         r, timestamp_string.data(),   (long long)time_ms);
                     return r;
                 }
@@ -2167,4 +2269,114 @@ int rtdb::wide::deal_with_for_boolean(std::string& value, tsdb_str& ts, enum tsd
 
 
     return EINVAL;
+}
+
+
+/**
+ * @brief  整理分隔符号 目前支持 "\t" " " "\n" "\r" "\'" "\"" "," 符号  
+ * @param[in]  const char *sep            从命令行获取到的分隔符号  
+ * @param[out] std::string &sep_after     返回处理后的分隔符号  
+ * @return   0 成功 其他 错误  
+ */
+int rtdb::wide::tidy_separate_symbol(const char* sep, std::string& sep_after)
+{
+    int r = 0;
+
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    sep_after.reserve(strlen(sep));
+    sep_after.resize(0);
+
+
+    for (size_t i=0; i<strlen(sep); i++)
+    {
+        // 制表符  
+        if ('\\' == sep[i] && (i+1)< strlen(sep) && 't' == sep[i+1] ) {
+            sep_after += "\t";
+            i++;
+            continue;
+        }
+
+        // 空格  
+        if (' ' == sep[i]) {
+            sep_after += " ";
+            continue;
+        }
+
+        // 换行  
+        if ('\\' == sep[i] && (i + 1) < strlen(sep) && 'n' == sep[i+1]) {
+            sep_after += "\n";
+            i++;
+            continue;
+        }
+
+        // 回车  
+        if ('\\' == sep[i] && (i + 1) < strlen(sep)  &&  'r' == sep[i+1]) {
+            sep_after += "\r";
+            i++;
+            continue;
+        }
+
+        // 单引号  
+        if ('\\' == sep[i] && (i + 1) < strlen(sep)  && '\'' == sep[i+1]) {
+            sep_after += "\'";
+            i++;
+            continue;
+        }
+
+        // 双引号  
+        if ('\\' == sep[i] && (i + 1) < strlen(sep) && '\"' == sep[i + 1]) {
+            sep_after += "\"";
+            i++;
+            continue;
+        }
+
+        // 逗号  
+        if (',' == sep[i]) {
+            sep_after += sep[i];
+            continue;
+        }
+
+        sep_after += sep[i];
+    }
+
+    return 0;
+}
+
+/**
+ * @brief  去除头尾字符仅仅是清理一次  
+ * @param[in]  const std::string &source  原始字符串  
+ * @param[in]  const char sep             分隔符号  
+ * @param[out] std::string &target        返回处理后的字符串  
+ * @return   0 成功 其他 错误  
+ */ 
+int rtdb::wide::trim_first_and_last_char_only_once
+(
+    const std::string& source, const char sep, std::string& target
+)
+{
+    std::string& s = (std::string&)source;
+    std::string::iterator begin = s.begin();
+    std::string::iterator end = s.end();
+
+    // 如果字符串为空 或者仅仅只有一个字符 则啥也不做 直接退出  
+    if (source.empty() || 1 == source.length()) {
+        target = source;
+        return 0;
+    }
+
+    // 字符串开始位置 比较  
+    if (*begin == sep) {
+        begin++;
+    }
+
+    // 字符串结束位置 比较  
+    if (*(end-1) == sep) {
+        end--;
+    }
+
+    target.assign(begin, end);
+
+    return 0;
 }

@@ -4,6 +4,7 @@
 #include "wide_base.h"
 //#include "source/source.h"
 #include <map>
+#include "utils.h"
 
 
 namespace rtdb
@@ -21,7 +22,7 @@ struct thread_param_insert_table_general_t
 
     thread_param_insert_table_general_t()
 
-        : lines()
+        : lines(), sep(DEFAULT_CSV_FILE_SEP)
 
     {}
 
@@ -120,6 +121,9 @@ struct thread_param_insert_table_general_t
     // padding memory, nothing.
     // 插入点数  
     volatile uint64_t           insert_point;
+
+    // 字段间的分隔符号  
+    std::string sep;
 
     char                        padding[64];
 

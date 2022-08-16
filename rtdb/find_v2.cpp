@@ -102,7 +102,7 @@ void * find_table_thread_v2( void * _param )
     std::string field_list;
 
     try {
-        sql.reserve( 8192 );
+        sql.reserve(DEFAULT_BUFFER_BYTES);
     } catch ( ... ) {
         TSDB_ERROR( p, "[FIND][r=ENOMEM]" );
         param->r = ENOMEM;

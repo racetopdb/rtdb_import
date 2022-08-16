@@ -6,16 +6,35 @@ CURL_PATH = ../../rtdb/CURL
 CJSON_PATH = ../../rtdb/CJSON
 OPENTSDB_PATH = ../../rtdb/OPENTSDB
 INFLUXDB_PATH = ../../rtdb/INFLUXDB
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+CLICKHOUSE_PATH = ../../rtdb/CLICKHOUSE
+endif
 OUTPUT_PATH  = ../../output
 
 INCLUDE     = -I$(RTDB_PATH)/include -I$(TAOS_PATH)/include -I$(TIMESCALEDB_PATH)/include -I$(OPENTSDB_PATH)/include -I$(CURL_PATH)/include -I$(CJSON_PATH) -I$(INFLUXDB_PATH) -I../../rtdb/source -I../../rtdb/source/dir  -I../../rtdb/source/none 
+
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+INCLUDE += -std=c++17 -I$(CLICKHOUSE_PATH)/include -I$(CLICKHOUSE_PATH)/include/contrib
+else
+INCLUDE += -std=c++98
+endif
+
+
 
 RTDB_LIB    = 
 TAOS_LIB    = -L$(TAOS_PATH)/$(PLATFORM) -ltaos
 TIMESCALEDB_LIB    = -L$(TIMESCALEDB_PATH)/$(PLATFORM) -lpq
 CURL_LIB    = -L$(CURL_PATH)/$(PLATFORM) -lcurl
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+CLICKHOUSE_LIB = -L$(CLICKHOUSE_PATH)/$(PLATFORM) -labsl-lib  -lcityhash-lib -lclickhouse-cpp-lib -lclickhouse-cpp-lib-static  -llz4-lib
+endif
 
-LIB         = -lpthread -pthread -lrt -ldl $(RTDB_LIB) $(TAOS_LIB) $(TIMESCALEDB_LIB) $(CURL_LIB)
+LIB         = -lpthread -pthread -lrt -ldl $(RTDB_LIB) $(TAOS_LIB) $(TIMESCALEDB_LIB) $(CURL_LIB) 
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+LIB         += $(CLICKHOUSE_LIB)
+endif
+
+
 
 ifeq ($(debug), false)
 CFLAGS      = -O3 $(FLAGS) $(CPU_FLAGS)
@@ -49,6 +68,11 @@ endif
 
 ./o/INFLUXDB_%.o:       ../../rtdb/INFLUXDB/%.cpp
 	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+./o/CLICKHOUSE_%.o:       ../../rtdb/CLICKHOUSE/%.cpp
+	$(CPPC)                $(CFLAGS) $(INCLUDE) -c -o $@ $<
+endif
 
 
 ./o/rtdb_source_%.o:       ../../rtdb/source/%.cpp
@@ -95,6 +119,13 @@ wide_RTDB_OBJECTS =  \
 	./o/file_operation.o	\
 	./o/wide_base.o
 	
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+wide_RTDB_OBJECTS += \
+	./o/CLICKHOUSE_wide_clickhouse.o	\
+	./o/CLICKHOUSE_wide_clickhouse_conn.o	
+endif
+
+
 all:
 	mkdir -p ./o
 	mkdir -p $(OUTPUT_DIR)
@@ -115,8 +146,9 @@ rtdb_import: $(wide_RTDB_OBJECTS)
 	rm -rf $(OUTPUT_DIR)/libcurl.so  
 	rm -rf $(OUTPUT_DIR)/libcurl.so.4  
 	rm -rf $(OUTPUT_DIR)/libcurl.so.4.8.0
-
-
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+	rm -rf $(OUTPUT_DIR)/libclickhouse-cpp-lib.so
+endif
 	cp $(LIB_DIR)/libtsdb.so $(OUTPUT_DIR)/
 	cp $(TAOS_PATH)/$(PLATFORM)/libtaos.so $(OUTPUT_DIR)/libtaos.so.1
 #cp $(TIMESCALEDB_PATH)/$(PLATFORM)/libpq.a $(OUTPUT_DIR)/
@@ -125,6 +157,9 @@ rtdb_import: $(wide_RTDB_OBJECTS)
 #ln -s $(OUTPUT_DIR)/libpq.so.5.11 $(OUTPUT_DIR)/libpq.so.5
 	
 	cp $(CURL_PATH)/$(PLATFORM)/libcurl.so.4.8.0  $(OUTPUT_DIR)/libcurl.so.4
+ifeq ($(ENABLE_C_PLUS_PLUS_17), true)
+	cp $(CLICKHOUSE_PATH)/$(PLATFORM)/libclickhouse-cpp-lib.so  $(OUTPUT_DIR)/libclickhouse-cpp-lib.so
+endif
 	
 	
 	$(CPPC) -rdynamic $(LIB)				\

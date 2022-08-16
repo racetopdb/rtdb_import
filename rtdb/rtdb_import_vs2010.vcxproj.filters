@@ -1,0 +1,262 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="RTDB">
+      <UniqueIdentifier>{86a36072-11e7-4c53-9b5c-ed63d64512c1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RTDB\include">
+      <UniqueIdentifier>{673cf9c8-8a51-4a2e-8f3f-188988d0a1a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TAOS">
+      <UniqueIdentifier>{1ce75de7-da8a-43d2-9ee8-538bd04d4625}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TAOS\include">
+      <UniqueIdentifier>{aee63b58-3449-4e71-a7c9-a57f14e42dff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\source">
+      <UniqueIdentifier>{84166235-95b4-4712-aa1c-258a6a2946dd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\source\dir">
+      <UniqueIdentifier>{88d95fb0-4862-4434-91f2-d010df943703}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\source\none">
+      <UniqueIdentifier>{fe25f6f5-e2b0-4ffe-a8b0-a8420217bd05}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TIMESCALEDB">
+      <UniqueIdentifier>{1e5e9287-a222-4c45-b9a0-f725e0fcff3a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TIMESCALEDB\include">
+      <UniqueIdentifier>{e9818ddb-0b8c-4299-aa3d-d8f0fd3821f1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="TIMESCALEDB\include\catalog">
+      <UniqueIdentifier>{9b649f8f-d7a7-485a-bab7-5cb7cb76ff68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OPENTSDB">
+      <UniqueIdentifier>{51a5265e-3696-46a5-8df8-66d581c29e57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CJSON">
+      <UniqueIdentifier>{daffc252-b4a8-46c6-821e-1ae508dc3e09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="INFLUXDB">
+      <UniqueIdentifier>{94baf808-c26d-4233-9c61-4b85e6e79062}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="generate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="create_table.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="insert.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="find.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RTDB\wide_rtdb.cpp">
+      <Filter>RTDB</Filter>
+    </ClCompile>
+    <ClCompile Include="RTDB\wide_rtdb_conn.cpp">
+      <Filter>RTDB</Filter>
+    </ClCompile>
+    <ClCompile Include="wide_base.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TAOS\wide_taos.cpp">
+      <Filter>TAOS</Filter>
+    </ClCompile>
+    <ClCompile Include="TAOS\wide_taos_conn.cpp">
+      <Filter>TAOS</Filter>
+    </ClCompile>
+    <ClCompile Include="utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="file_operation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="create_table_v2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="insert_v2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="find_v2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="create_table_general.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="find_general.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="generate_general.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="insert_general.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\source.cpp">
+      <Filter>Source Files\source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\dir\dir_source.cpp">
+      <Filter>Source Files\source\dir</Filter>
+    </ClCompile>
+    <ClCompile Include="source\dir\dir_worker.cpp">
+      <Filter>Source Files\source\dir</Filter>
+    </ClCompile>
+    <ClCompile Include="source\none\none_source.cpp">
+      <Filter>Source Files\source\none</Filter>
+    </ClCompile>
+    <ClCompile Include="source\none\none_worker.cpp">
+      <Filter>Source Files\source\none</Filter>
+    </ClCompile>
+    <ClCompile Include="TIMESCALEDB\wide_timescaledb.cpp">
+      <Filter>TIMESCALEDB</Filter>
+    </ClCompile>
+    <ClCompile Include="TIMESCALEDB\wide_timescaledb_conn.cpp">
+      <Filter>TIMESCALEDB</Filter>
+    </ClCompile>
+    <ClCompile Include="HTTP.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="OPENTSDB\wide_opentsdb.cpp">
+      <Filter>OPENTSDB</Filter>
+    </ClCompile>
+    <ClCompile Include="OPENTSDB\wide_opentsdb_conn.cpp">
+      <Filter>OPENTSDB</Filter>
+    </ClCompile>
+    <ClCompile Include="CJSON\cJSON.cpp">
+      <Filter>CJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="CJSON\cJSON_Utils.cpp">
+      <Filter>CJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="INFLUXDB\wide_influxdb.cpp">
+      <Filter>INFLUXDB</Filter>
+    </ClCompile>
+    <ClCompile Include="INFLUXDB\wide_influxdb_conn.cpp">
+      <Filter>INFLUXDB</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="TAOS\include\stdbool.h">
+      <Filter>TAOS\include</Filter>
+    </ClInclude>
+    <ClInclude Include="TAOS\include\taos.h">
+      <Filter>TAOS\include</Filter>
+    </ClInclude>
+    <ClInclude Include="TAOS\include\taoserror.h">
+      <Filter>TAOS\include</Filter>
+    </ClInclude>
+    <ClInclude Include="wide_base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RTDB\wide_rtdb.h">
+      <Filter>RTDB</Filter>
+    </ClInclude>
+    <ClInclude Include="RTDB\wide_rtdb_conn.h">
+      <Filter>RTDB</Filter>
+    </ClInclude>
+    <ClInclude Include="TAOS\wide_taos.h">
+      <Filter>TAOS</Filter>
+    </ClInclude>
+    <ClInclude Include="TAOS\wide_taos_conn.h">
+      <Filter>TAOS</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="file_operation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RTDB\include\dpr_stdinc.h">
+      <Filter>RTDB\include</Filter>
+    </ClInclude>
+    <ClInclude Include="RTDB\include\tsdb_tools.h">
+      <Filter>RTDB\include</Filter>
+    </ClInclude>
+    <ClInclude Include="RTDB\include\tsdb_v3.h">
+      <Filter>RTDB\include</Filter>
+    </ClInclude>
+    <ClInclude Include="source\source.h">
+      <Filter>Source Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\dir\dir_source.h">
+      <Filter>Source Files\source\dir</Filter>
+    </ClInclude>
+    <ClInclude Include="source\dir\dir_worker.h">
+      <Filter>Source Files\source\dir</Filter>
+    </ClInclude>
+    <ClInclude Include="source\none\none_source.h">
+      <Filter>Source Files\source\none</Filter>
+    </ClInclude>
+    <ClInclude Include="source\none\none_worker.h">
+      <Filter>Source Files\source\none</Filter>
+    </ClInclude>
+    <ClInclude Include="insert_general.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\include\libpq-fe.h">
+      <Filter>TIMESCALEDB\include</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\include\pg_config_ext.h">
+      <Filter>TIMESCALEDB\include</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\include\postgres_ext.h">
+      <Filter>TIMESCALEDB\include</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\include\catalog\genbki.h">
+      <Filter>TIMESCALEDB\include\catalog</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\include\catalog\pg_type.h">
+      <Filter>TIMESCALEDB\include\catalog</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\wide_timescaledb.h">
+      <Filter>TIMESCALEDB</Filter>
+    </ClInclude>
+    <ClInclude Include="TIMESCALEDB\wide_timescaledb_conn.h">
+      <Filter>TIMESCALEDB</Filter>
+    </ClInclude>
+    <ClInclude Include="HTTP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="OPENTSDB\wide_opentsdb.h">
+      <Filter>OPENTSDB</Filter>
+    </ClInclude>
+    <ClInclude Include="OPENTSDB\wide_opentsdb_conn.h">
+      <Filter>OPENTSDB</Filter>
+    </ClInclude>
+    <ClInclude Include="CJSON\cJSON.h">
+      <Filter>CJSON</Filter>
+    </ClInclude>
+    <ClInclude Include="CJSON\cJSON_Utils.h">
+      <Filter>CJSON</Filter>
+    </ClInclude>
+    <ClInclude Include="INFLUXDB\wide_influxdb.h">
+      <Filter>INFLUXDB</Filter>
+    </ClInclude>
+    <ClInclude Include="INFLUXDB\wide_influxdb_conn.h">
+      <Filter>INFLUXDB</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\README.md" />
+    <None Include="..\make\build.mk" />
+    <None Include="..\make\centos73\makefile" />
+  </ItemGroup>
+</Project>

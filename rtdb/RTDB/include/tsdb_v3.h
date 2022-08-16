@@ -9,15 +9,15 @@
 //<private>
 /// version of current interface, even change compability, we must increment this version
 //</private>
-#define TSDB_V3_VERSION                 ((uint64_t)202204140917)
+#define TSDB_V3_VERSION                 ((uint64_t)202207281444)
 //<private>
 /// version of lowest interface, for compability
 //</private>
-#define TSDB_V3_VERSION_LOW             ((uint64_t)202204140917)
+#define TSDB_V3_VERSION_LOW             ((uint64_t)202207281444)
 //<private>
 /// server version
 //</private>
-#define TSDB_SERVER_VERSION             300
+#define TSDB_SERVER_VERSION             ((uint64_t)202207281444)
 
 #define TSDB_FIELD_NAME_LEN             128
 #define TSDB_TABLE_NAME_LEN             128
@@ -349,6 +349,13 @@ struct tsdb_v3_iterator_t
     tsdb_v3_reader_t * ( * parent )( tsdb_v3_iterator_t * res );
 
     /**
+     * @brief is the iterator reach the end of recordset
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @return BOOL
+     */
+    BOOL ( * is_eof )( tsdb_v3_iterator_t * res );
+
+    /**
      * @brief Gets next row in current search result.
      *        If the current query statement does not return a result data,
      *        this function returns ENODATA
@@ -378,6 +385,130 @@ struct tsdb_v3_iterator_t
      * @see tsdb_v3_t::query()
      */
     int ( * reset )( tsdb_v3_iterator_t * res );
+
+    /**
+     * @brief Gets the field count in the current search result.
+     *        If the current query statement does not return a result data,
+     *        this function returns 0
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @return uint32_t field count in result data set.
+     * @see tsdb_v3_t::query()
+     */
+    uint32_t ( * field_count )( tsdb_v3_iterator_t * res );
+
+    /**
+     * @brief Gets special field in the current search result.
+     *        If the current query statement does not return a result data,
+     *        this function returns NULL
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @param[int] uint32_t field_index    field index
+     * @return RTDB_FIELD * field
+     * @see tsdb_v3_t::query()
+     */
+    tsdb_v3_field_t * ( * field_get )( tsdb_v3_iterator_t * res, uint32_t field_index );
+
+    /**
+     * @brief find special field by name in the current search result.
+     *        If the current query statement does not return a result data,
+     *        this function returns NULL
+     * @param[in] tsdb_v3_reader_t *  res
+     * @param[in] const char * name
+     * @return RTDB_FIELD * field
+     * @see tsdb_v3_t::query()
+     */
+    tsdb_v3_field_t * ( * field_find )( tsdb_v3_iterator_t * res, const char * name );
+
+    const tsdb_datatype_info_t * ( * field_get_datatype )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    const tsdb_datatype_info_t * ( * field_find_datatype )( tsdb_v3_iterator_t * res, const char * name );
+
+    /**
+     * @brief Gets the length of the specified field to display data
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @param[in] const char * name
+     * @return RTDB_FIELD * field
+     * @see tsdb_v3_t::query()
+     */
+    int ( * field_show_length )( tsdb_v3_iterator_t * res, uint32_t field_index );
+
+    /**
+     * @brief Gets the row count in the current search result.
+     *        If the current query statement does not return a result data,
+     *        this function returns 0
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @return uint64_t row count in result data set.
+     * @see tsdb_v3_t::query()
+     */
+    uint64_t ( * row_count )( tsdb_v3_iterator_t * res );
+
+    /**
+     * @brief Gets the data of the specified field of the current record.
+     *        For the convenience of display, the returned data fills the remaining space with spaces.
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @param[in] uint32_t field_index
+     * @param[out] int * len      Return data length
+     * @return const char *       value
+     * @see tsdb_v3_t::query()
+     */
+    const char * ( * get_str_aligned )( tsdb_v3_iterator_t * res, uint32_t field_index, int * len );
+
+    /**
+     * @brief Gets the specified field name.
+     *        For the convenience of display, the returned data fills the remaining space with spaces.
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @param[in] uint32_t field_index
+     * @param[out] int * len      Return field name length
+     * @return const char * field_name
+     * @see tsdb_v3_t::query()
+     */
+    const char * ( * get_field_aligned )( tsdb_v3_iterator_t * res, uint32_t field_index, int * len );
+
+    /**
+     * @brief Checks whether the value of the specified field in the current row is NULL
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @param[in] uint32_t field_index
+     * @return BOOL  return TRUE if the value is NULL
+     * @see tsdb_v3_t::query()
+     */
+    BOOL         ( * is_null       )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    BOOL         ( * is_null_s     )( tsdb_v3_iterator_t * res, const char * field );
+
+    /**
+     * @brief get the bool field value in the current row, return NULL if NULL
+     * @param[in] tsdb_v3_iterator_t *  res
+     * @param[in] uint32_t field_index
+     * @return byte_t *  return point of byte_t, 1 indicate TRUE, and 0 indicate FALSE
+     * @see tsdb_v3_t::query()
+     */
+    byte_t *     ( * get_bool       )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    int *        ( * get_int        )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    int64_t *    ( * get_int64      )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    int64_t *    ( * get_datetime_ms)( tsdb_v3_iterator_t * res, uint32_t field_index );
+    float *      ( * get_float      )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    double *     ( * get_double     )( tsdb_v3_iterator_t * res, uint32_t field_index );
+    const char * ( * get_string     )( tsdb_v3_iterator_t * res, uint32_t field_index, uint32_t * length );
+    const void * ( * get_pointer    )( tsdb_v3_iterator_t * res, uint32_t field_index );
+
+    byte_t *     ( * get_bool_s         )( tsdb_v3_iterator_t * res, const char * field );
+    int *        ( * get_int_s          )( tsdb_v3_iterator_t * res, const char * field );
+    int64_t *    ( * get_int64_s        )( tsdb_v3_iterator_t * res, const char * field );
+    int64_t *    ( * get_datetime_ms_s  )( tsdb_v3_iterator_t * res, const char * field );
+    float *      ( * get_float_s        )( tsdb_v3_iterator_t * res, const char * field );
+    double *     ( * get_double_s       )( tsdb_v3_iterator_t * res, const char * field );
+    const char * ( * get_string_s       )( tsdb_v3_iterator_t * res, const char * field, uint32_t * length );
+    const void * ( * get_pointer_s      )( tsdb_v3_iterator_t * res, const char * field );
+};
+
+enum tsdb_qrsp_type_t
+{
+    //<private>
+    // 当前记录集返回的是用户的查询结果，注意根据查询语句决定，查询结果可能有返回记录集，也可能没有返回记录集。  
+    //</private>
+    TSDB_QRSP_USER_QUERY_RESULT     = 0,
+
+    //<private>
+    // 当前记录集返回的是错误信息表，截止到 2022-05-10 08:47 该类型的返回记录集还未实现。  
+    //</private>
+    TSDB_QRSP_ERROR_INFO            = 1
 };
 
 struct tsdb_v3_reader_t
@@ -660,6 +791,159 @@ struct tsdb_v3_reader_t
         tsdb_v3_reader_t *  self,
         const char *        db
     );
+
+    /**
+     * @brief Set the values of all fields in the row being added in 'res'
+     *        to the corresponding field values in the current row in 'from'.
+     *        The field settings of both sides must be equal.
+     * @param[in] tsdb_v3_reader_t * res - current reader. row_add* function must already called.
+     * @param[in] tsdb_v3_reader_t * from- another reader that is data source. cursor_next must already called.
+     * @return int.  error number, 0 indicate NO error.
+     * @par Sample
+     * @code
+        int r;
+
+        ///////////////////////////////////////////////////////////////
+        // prepare src local table
+
+        tsdb_v3_t * tsdb = tsdb_v3_tls( TSDB_V3_VERSION );
+        assert( tsdb );
+
+        // create a table object, type is 'local' table
+        tsdb_v3_reader_t * src = tsdb->table_new( "local" );
+        assert( src );
+
+        // add a field called a, type is int
+        r = src->field_add( src, "a", TSDB_DATATYPE_INT, 0, TRUE, NULL );
+        assert( 0 == r );
+
+        // add a row
+        r = src->row_add( src );
+        assert( 0 == r );
+        // first field's type is int.
+        r = src->set_int( src, 0, 12 );
+        assert( 0 == r );
+        // commit to add a row
+        r = src->row_add_commit( src );
+        assert( 0 == r );
+
+        // add a row
+        r = src->row_add( src );
+        assert( 0 == r );
+        // first field's type is int.
+        r = src->set_int( src, 0, 13 );
+        assert( 0 == r );
+        // commit to add a row
+        r = src->row_add_commit( src );
+        assert( 0 == r );
+
+        uint64_t src_row_count = src->row_count( src );
+        assert( 2 == src_row_count );
+        printf( "src's record_count = %lld\n", (long long)src_row_count );
+
+        // prepare src local table
+        ///////////////////////////////////////////////////////////////
+        // prepare dst local table
+
+        tsdb_v3_reader_t * dst = tsdb->table_new( "local" );
+        assert( dst );
+
+        // add a field called a, type is int
+        r = dst->field_add( dst, "a", TSDB_DATATYPE_INT, 0, TRUE, NULL );
+        assert( 0 == r );
+
+        uint64_t dst_row_count = dst->row_count( dst );
+        assert( 0 == dst_row_count );
+        printf( "dst's record_count = %lld\n", (long long)dst_row_count );
+
+        // prepare dst local table
+        ///////////////////////////////////////////////////////////////
+        // copy from src to dst
+
+        r = src->cursor_reset( src );
+        assert( 0 == r );
+        while ( true ) {
+            r = src->cursor_next( src );
+            if ( 0 != r ) {
+                break;
+            }
+
+            // add a row
+            r = dst->row_add( dst );
+            assert( 0 == r );
+
+            // copy all fields value from 'src' to dest's current adding row
+            r = dst->set_row_from( dst, src );
+            assert( 0 == r );
+
+            // commit to add a row
+            r = dst->row_add_commit( dst );
+            assert( 0 == r );
+        }
+        dst_row_count = dst->row_count( dst );
+        assert( src_row_count == dst_row_count );
+        printf( "dst's record_count = %lld\n", (long long)dst_row_count );
+
+        // copy from src to dst
+        ///////////////////////////////////////////////////////////////
+        // print dst
+
+        // print field line
+        for ( uint32_t i = 0; i < dst->field_count( dst ); ++ i ) {
+            tsdb_v3_field_t * field = dst->field_get( dst, i );
+            assert( field );
+            if ( 0 != i ) {
+                printf( "\t" );
+            }
+            printf( "%s", field->name );
+        }
+        printf( "\n\n" );
+
+        r = dst->cursor_reset( dst );
+        assert( 0 == r );
+
+        // print data lines
+        while ( true ) {
+            r = dst->cursor_next( dst );
+            if ( 0 != r ) {
+                break;
+            }
+
+            for ( uint32_t i = 0; i < dst->field_count( dst ); ++ i ) {
+                if ( 0 != i ) {
+                    printf( "\t" );
+                }
+                uint32_t len;
+                const char * s = dst->get_string( dst, 0, & len );
+                if ( NULL == s ) {
+                    printf( "NULL" );
+                } else {
+                    fwrite( s, 1, len, stdout );
+                }
+            }
+            printf( "\n" );
+        }
+
+        // print dst
+        ///////////////////////////////////////////////////////////////
+
+        src->kill_me( src );
+        dst->kill_me( dst );
+     * @endcode
+     */
+    int         ( * set_row_from  )( tsdb_v3_reader_t * res, tsdb_v3_reader_t * from );
+
+    //<private>
+    /**
+     * @brief 设置 field_count() 函数返回的字段数量，本类用于限制把前面 count 个字段的数据给别人展示。  
+     * @param[in] uint32_t count 希望 field_count() 函数返回的字段数量。  
+     * @return int 错误码。  
+     */
+    //</private>
+    int         ( * set_field_count_limit )( tsdb_v3_reader_t * res, uint32_t count );
+
+    const char * ( * get_table_name )( tsdb_v3_reader_t * res );
+    void         ( * set_table_name )( tsdb_v3_reader_t * res, const char * table_name );
 };
 
 /**
@@ -1139,11 +1423,62 @@ struct tsdb_v3_t
      * @param[in] int         rsp_bytes response packet bytes
      * @return int.  error number, 0 indicate NO error.
      */
-    int ( * call_test )(
+    int ( * test_call )(
         tsdb_v3_t *                 self,
         int                         req_bytes,
         int                         rsp_bytes
     );
+
+    /**
+     * @brief print result as string
+     * @param[in] tsdb_v3_t * self
+     * @param[in] const char * parameters. optional extent parameters, support NULL.
+     * @param[out] const char * * str return point to string, caller should not delete it.
+     *             This value is valid before next time to call print function.
+     *             The data will be write to stdout and fflush( stdout ), if this parameter is NULL.
+     * @param[out] int * str_len      str length by char. not including '\0'
+     * @return int.  error number, 0 indicate NO error.
+     * @par Sample
+     * @code
+        // Ignore error check for easy reading.
+        // @see tsdb_v3_tls_t
+        // @see tsdb_v3_tls_s()
+        // @see tsdb_v3_new_t
+        // @see tsdb_v3_new_s()
+        RTDB * rtdb = tsdb_v3_tls_s( TSDB_V3_VERSION );
+
+        int r = 0;
+
+        const char sql[] = "select * from table";
+        r = rtdb->query( tsdb, sql, (int)strlen(sql), NULL );
+        if ( 0 != r ) {
+            printf( "[r=%d]query failed\n", r );
+            goto err;
+        }
+
+        // direct write data into stdout
+        rtdb->print( rtdb, NULL, NULL, NULL );
+
+        // OR, write data into a string, then we write it to stdout by manual.
+        const char * str;
+        int          str_len;
+        rtdb->print( rtdb, NULL, & str, & str_len );
+        fwrite( str, 1, (size_t)str_len, stdout );
+        fflush( stdout );
+     * @endcode
+     */
+    int ( * print )(
+        tsdb_v3_t *                 self,
+        const char *                parameters,
+        const char * *              str,
+        int *                       str_len
+    );
+
+    /**
+     * @brief call this if user press Ctrl+C or close the client window
+     */
+    void ( * user_break )();
+
 };
 
 ///////////////////////////////////////////////////////////////////////

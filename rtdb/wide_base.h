@@ -14,6 +14,12 @@
 #define ENABLE_TIMESCALEDB     1
 #endif
 
+#if defined (_WIN64) || defined (__linux__)
+#if ((_MSC_VER >= 1920 ) || (__GNUC__ > 9) || (__GNUC__ == 9 && __GNUC_MINOR__ > 3) || (__GNUC__ == 9 && __GNUC_MINOR__ == 3 && __GNUC_PATCHLEVEL__ == 1)) && (__cplusplus >= 201703L)
+#define ENABLE_CLICKHOUSE     1
+#endif
+#endif
+
 
 #define ENABLE_OPENTSDB     1
 
@@ -39,8 +45,10 @@ enum db_type_t
 
     DB_INFLUXDB = 5,
 
+    DB_CLICKHOUSE = 6,
+
     #define DB_FIRST    DB_RTDB
-    #define DB_LAST     DB_INFLUXDB
+    #define DB_LAST     DB_CLICKHOUSE
 };
 
 bool        rtdb_init( const char * path );

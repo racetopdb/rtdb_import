@@ -159,6 +159,30 @@ typedef struct tsdb_str
 } tsdb_str;
 #endif // #ifndef TSDB_STR_DEFINED
 
+#if ! defined( CHECK_PATH_TYPE_DEFINED )
+    #define CHECK_PATH_TYPE_DEFINED
+    //<private>
+    /// 无效的路径，如：空串这种。但事实上，无论出任何内部错误（没内存不够了）都会返回此值  
+    //</private>
+    #define CHECK_PATH_INVALID          0
+    //<private>
+    /// 路径是一部分路径  
+    //</private>
+    #define CHECK_PATH_PART             1
+    //<private>
+    /// 路径是 Samba 路径  
+    //</private>
+    #define CHECK_PATH_SAMBA            2
+    //<private>
+    /// 路径是完整的 Windows 路径（带盘符）  
+    //</private>
+    #define CHECK_PATH_WINDOWS          3
+    //<private>
+    /// 路径是完整的 *NIX 路径（以 / 开头）  
+    //</private>
+    #define CHECK_PATH_LINUX            4
+#endif // #if ! defined( CHECK_PATH_TYPE_DEFINED )
+
 // task interface var C interface
 struct tsdb_task_t
 {
@@ -311,7 +335,7 @@ struct tsdb_tools_t
     const char * ( * get_log_path )();
 
     /**
-     * @brief 返回指定 time_t 时间的详细信息  
+     * @brief 返回指定 time_t 时间的 本地时间 详细信息  
      * @param[in] int64_t v     time_t 时间值  
      * @param[out] int * year   年  
      * @param[out] int * year   月  
@@ -331,8 +355,31 @@ struct tsdb_tools_t
         int *                           second
     );
 
+    //<private>
     /**
-     * @brief 给定年月日时分秒，返回 time_t
+     * @brief 返回指定 time_t 时间的 GMT 详细信息  
+     * @param[in] time_t v      时间值  
+     * @param[out] int * year   年  
+     * @param[out] int * year   月  
+     * @param[out] int * year   日  
+     * @param[out] int * year   时  
+     * @param[out] int * year   分  
+     * @param[out] int * year   秒  
+     * @return bool 是否成功调用  
+     */
+    //</private>
+    BOOL ( * time_info_gmt )(
+        time_t      v,
+        int *       year,
+        int *       month,
+        int *       day,
+        int *       hour,
+        int *       minute,
+        int *       second
+    );
+
+    /**
+     * @brief 给定 本地时间 年月日时分秒，返回 time_t
      * @param[in] int  year   年  
      * @param[in] int  year   月  
      * @param[in] int  year   日  
@@ -349,6 +396,26 @@ struct tsdb_tools_t
         int                             minute,
         int                             second
     );
+    //<private>
+    /**
+     * @brief 给定 GMT 时间年月日时分秒，返回 time_t
+     * @param[in] int  year   年  
+     * @param[in] int  year   月  
+     * @param[in] int  year   日  
+     * @param[in] int  year   时  
+     * @param[in] int  year   分  
+     * @param[in] int  year   秒  
+     * @return time_t 返回 time_t 值  
+     */
+    //</private>
+    time_t ( * time_make_gmt )(
+        int         year,
+        int         month,
+        int         day,
+        int         hour,
+        int         minute,
+        int         second
+    );
 
     /**
      * @brief 给定字符串表示，返回 time_t
@@ -362,7 +429,7 @@ struct tsdb_tools_t
     );
 
     /**
-     * @brief 根据给定的 time_t 值，返回字符串表示的时间  
+     * @brief 根据给定的 time_t 值，返回字符串表示的 本地 时间  
      * @param[in] int64_t v         time_t 时间值  
      * @param[in] char * str        字符串缓冲区，调用方分配  
      * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
@@ -374,6 +441,51 @@ struct tsdb_tools_t
         int *                           str_len
     );
 
+    //<private>
+    /**
+     * @brief 根据给定的 time_t 值，返回字符串表示的 GMT 时间  
+     * @param[in] time_t v          时间值  
+     * @param[out] char * str       字符串缓冲区，调用方分配  
+     * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
+     * @return bool 是否成功  
+     */
+    //</private>
+    BOOL ( * time_to_str_gmt )(
+        time_t      v,
+        char *      str,
+        int *       str_len
+    );
+
+    //<private>
+    /**
+     * @brief 根据给定的 time_t 值，返回符合 RFC867 字符串规范表示的 本地 时间  
+     * @param[in] time_t v          时间值  
+     * @param[out] char * str       字符串缓冲区，调用方分配  
+     * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
+     * @return bool 是否成功  
+     */
+    //</private>
+    BOOL ( * time_to_rfc867 )(
+        time_t      v,
+        char *      str,
+        int *       str_len
+    );
+
+    //<private>
+    /**
+     * @brief 根据给定的 time_t 值，返回符合 RFC867 字符串规范表示的 GMT 时间  
+     * @param[in] time_t v          时间值  
+     * @param[out] char * str       字符串缓冲区，调用方分配  
+     * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
+     * @return bool 是否成功  
+     */
+    //</private>
+    BOOL ( * time_to_rfc867_gmt )(
+        time_t      v,
+        char *      str,
+        int *       str_len
+    );
+
     /**
      * @brief 取得当前时间，从1970年开始的毫秒数  
      * @return uint64_t result 返回的缓冲区  
@@ -381,7 +493,7 @@ struct tsdb_tools_t
     uint64_t ( * datetime_now )();
 
     /**
-     * @brief 给定年月日时分秒毫秒，返回从1970年开始的毫秒数  
+     * @brief 给定 本地时间 年月日时分秒毫秒，返回从1970年开始的毫秒数  
      * @param[in] int  year         年  
      * @param[in] int  month        月  
      * @param[in] int  day          日  
@@ -392,6 +504,27 @@ struct tsdb_tools_t
      * @return uint64_t 返回值，0表示失败  
      */
     uint64_t ( * datetime_make )(
+        int                             year,
+        int                             month,
+        int                             day,
+        int                             hour,
+        int                             minute,
+        int                             second,
+        int                             ms
+    );
+
+    /**
+     * @brief 给定 GMT 时间 年月日时分秒毫秒，返回从1970年开始的毫秒数  
+     * @param[in] int  year         年  
+     * @param[in] int  month        月  
+     * @param[in] int  day          日  
+     * @param[in] int  hour         时  
+     * @param[in] int  minute       分  
+     * @param[in] int  second       秒  
+     * @param[in] int  ms           毫秒  
+     * @return uint64_t 返回值，0表示失败  
+     */
+    uint64_t ( * datetime_make_gmt )(
         int                             year,
         int                             month,
         int                             day,
@@ -424,6 +557,31 @@ struct tsdb_tools_t
         int *                           ms
     );
 
+    //<private>
+    /**
+     * @brief 返回指定从1970年开始的毫秒数时间的详细信息，注意：是GMT时间  
+     * @param[in] uint64_t ticks     时间值  
+     * @param[out] int* year         年  
+     * @param[out] int* month        月  
+     * @param[out] int* day          日  
+     * @param[out] int* hour         时  
+     * @param[out] int* minute       分  
+     * @param[out] int* second       秒  
+     * @param[out] int* ms           毫秒  
+     * @return BOOL 是否成功调用  
+     */
+    //</private>
+    BOOL ( * datetime_info_gmt )(
+        uint64_t    ticks,
+        int *       year,
+        int *       month,
+        int *       day,
+        int *       hour,
+        int *       minute,
+        int *       second,
+        int *       ms
+    );
+
     /**
      * @brief 给定字符串表示，返回从1970年开始的毫秒数时间  
      * @param[in] const char * str  字符串  
@@ -436,7 +594,7 @@ struct tsdb_tools_t
     );
 
     /**
-     * @brief 根据给定从1970年开始的毫秒数时间值，返回字符串表示的时间  
+     * @brief 根据给定从1970年开始的毫秒数时间值，返回字符串表示的 本地 时间  
      * @param[in] uint64_t v        时间值  
      * @param[in] char * str        字符串缓冲区，调用方分配  
      * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
@@ -446,6 +604,187 @@ struct tsdb_tools_t
         uint64_t                        v,
         char *                          str,
         int *                           str_len
+    );
+
+    /**
+     * @brief 根据给定从1970年开始的毫秒数时间值，返回字符串表示的 GMT 时间  
+     * @param[in] uint64_t v        时间值  
+     * @param[in] char * str        字符串缓冲区，调用方分配  
+     * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
+     * @return BOOL 是否成功  
+     */
+    BOOL ( * datetime_to_str_gmt )(
+        uint64_t                        v,
+        char *                          str,
+        int *                           str_len
+    );
+
+    //<private>
+    /**
+     * @brief 根据给定从1970年开始的毫秒数时间值，返回符合 rfc3339 规范的 GMT 时间  
+     * @param[in] uint64_t v        时间值  
+     * @param[in] BOOL enable_ns    此值为 ns 则输出中启动 ns，否则秒以下采用 ms
+     * @param[out] char * str       字符串缓冲区，调用方分配  
+     * @param[in,out] int * str_len 字符串长度。传入缓冲区字节数，返回实际写入字节数  
+     * @return bool 是否成功  
+     */
+    //</private>
+    int ( * datetime_to_rfc3339 )(
+        uint64_t    v,
+        BOOL        enable_ns,
+        char *      str,
+        int *       str_len
+    );
+
+    //<private>
+    /**
+     * @brief 判断两段时间是否有交集  
+     * @param[in] int64_t      left_first  第一个时间区间的开始时间（包含）  
+     * @param[in] int64_t      left_last   第一个时间区间的结束时间（包含）  
+     * @param[in] int64_t      right_first 第二个时间区间的开始时间（包含）  
+     * @param[in] int64_t      right_last  第一个时间区间的结束时间（包含）  
+     * @param[out,optional] int * left_indirection 第二个时间区间的时间所在的位置，只有本函数返回FALSE时本值才有可能为-1或1。  
+     *                                      如果该值为 -1，则 left 整个时间范围都比 right 早。  
+     *                                      如果该值为  1，则 left 整个时间范围都比 right 晚。  
+     *                                      其它情况该值为 0
+     * @return BOOL 如果两个时间有交集，则返回TRUE（同时 left_indirection返回0），否则返回FALSE
+     * @code
+        BOOL b;
+        int  li;
+        assert( ! check_time_intersection( 4, 6, 8, 10, NULL ) );
+        assert( ! check_time_intersection( 4, 6, 8, 10, & li ) && -1 == li );
+        assert( ! check_time_intersection( 8, 10, 4, 6, NULL ) );
+        assert( ! check_time_intersection( 8, 10, 4, 6, & li ) && 1 == li ); 
+        assert( check_time_intersection( 4, 8, 8, 9, & li ) && 0 == li );
+        assert( check_time_intersection( 4, 9, 8, 10, & li ) && 0 == li );
+        assert( check_time_intersection( 8, 10, 4, 9, & li ) && 0 == li );
+        assert( ! check_time_intersection( 10, 8, 4, 9, & li ) && 0 == li );
+        assert( ! check_time_intersection( 8, 10, 9, 4, & li ) && 0 == li );
+    * @endcode
+    * @code
+        bool in_time_scope( int64_t first_time_ms, int64_t last_time_ms, primary_index_item_t & index_item )
+        {
+            return check_time_intersection( first_time_ms, last_time_ms, index_item.first_time_ms, index_item.last_time_ms, NULL ) ? true : false;
+        }
+    * @endcode
+    */
+    //</private>
+    BOOL ( * check_time_intersection )(
+        int64_t         left_first,
+        int64_t         left_last,
+        int64_t         right_first,
+        int64_t         right_last,
+        int *           left_indirection
+    );
+
+    //<private>
+    /**
+     * @brief 检查两个时间是否是 本地时间 的同一天  
+     * @param[in] int64_t      lhd  第一个时间  
+     * @param[in] int64_t      rhd  第二个时间  
+     * @return BOOL 如果两个时间是同一天，则返回TRUE，否则返回FALSE
+     */
+    //</private>
+    BOOL ( * datetime_check_same_day )(
+        int64_t         lhd,
+        int64_t         rhd
+    );
+
+    //<private>
+    /**
+     * @brief 检查两个时间是否是 GMT 时间的同一天  
+     * @param[in] int64_t      lhd  第一个时间  
+     * @param[in] int64_t      rhd  第二个时间  
+     * @return BOOL 如果两个时间是同一天，则返回TRUE，否则返回FALSE
+     */
+    //</private>
+    BOOL ( * datetime_check_same_day_gmt )(
+        int64_t         lhd,
+        int64_t         rhd
+    );
+
+    //<private>
+    /**
+     * @brief 取指定时间的下一天最开始的时间。注意：是本地时间  
+     * @param[in] int64_t      v                时间戳 > 0  
+     * @param[in]  int         days             增加的天数。允许正数，0，负数  
+     * @param[out] int64_t *   result_day_first 返回那一天的起始时间ms  
+     * @param[out] int64_t *   result_day_last  返回那一天的最后一ms时间  
+     * @return int 如果成功，返回0，否则返回错误码。  
+     */
+    //</private>
+    int ( * datetime_add_days )(
+        int64_t         v,
+        int             days,
+        int64_t *       result_day_first,
+        int64_t *       result_day_last
+    );
+
+    //<private>
+    /**
+     * @brief 取指定时间的下一天最开始的时间。注意：是 GMT 时间  
+     * @param[in] int64_t      v                时间戳 > 0  
+     * @param[in]  int         days             增加的天数。允许正数，0，负数  
+     * @param[out] int64_t *   result_day_first 返回那一天的起始时间ms  
+     * @param[out] int64_t *   result_day_last  返回那一天的最后一ms时间  
+     * @return int 如果成功，返回0，否则返回错误码。  
+     */
+    //</private>
+    int ( * datetime_add_days_gmt )(
+        int64_t         v,
+        int             days,
+        int64_t *       result_day_first,
+        int64_t *       result_day_last
+    );
+
+    //<private>
+    /**
+     * @brief 根据昨天的 本地 时间取下一天的时间范围  
+     * @param[in/out] int64_t * first_ms        输入用户查询的 first 时间，这个变量会由  
+     *                                          datetime_scope_next 函数根据自己的需要修改，  
+     *                                          调用方从此不能再读写。  
+     *                                          本参数不允许为NULL
+     * @param[in]     int64_t   last_ms         用户查询的 last 时间。  
+     * @param[out]    int64_t * real_first_ms   本次真正需要查询的 first 时间。  
+     * @param[out]    int64_t * real_last_ms    本次真正需要查询的 last  时间。  
+     * @param[out]    int     * year            真正查询的年  
+     * @param[out]    int     * month           真正查询的月  
+     * @param[out]    int     * day             真正查询的日  
+     * @return int 成功与否， 0 表示成功，否则错误码。如果返回 ENODATA 说明没有数据了。  
+     */
+    //</private>
+    int ( * datetime_scope_next )( int64_t * first_ms,
+                            int64_t   last_ms,
+                            int64_t * real_first_ms,
+                            int64_t * real_last_ms,
+                            int *     real_year,
+                            int *     real_month,
+                            int *     real_day
+    );
+
+    //<private>
+    /**
+     * @brief 根据昨天的 GMT 时间取下一天的时间范围  
+     * @param[in/out] int64_t * first_ms        输入用户查询的 first 时间，这个变量会由  
+     *                                          datetime_scope_next 函数根据自己的需要修改，  
+     *                                          调用方从此不能再读写。  
+     *                                          本参数不允许为NULL
+     * @param[in]     int64_t   last_ms         用户查询的 last 时间。  
+     * @param[out]    int64_t * real_first_ms   本次真正需要查询的 first 时间。  
+     * @param[out]    int64_t * real_last_ms    本次真正需要查询的 last  时间。  
+     * @param[out]    int     * year            真正查询的年  
+     * @param[out]    int     * month           真正查询的月  
+     * @param[out]    int     * day             真正查询的日  
+     * @return int 成功与否， 0 表示成功，否则错误码。如果返回 ENODATA 说明没有数据了。  
+     */
+    //</private>
+    int ( * datetime_scope_next_gmt )( int64_t * first_ms,
+                                       int64_t   last_ms,
+                                       int64_t * real_first_ms,
+                                       int64_t * real_last_ms,
+                                       int *     real_year,
+                                       int *     real_month,
+                                       int *     real_day
     );
 
     /**
@@ -542,6 +881,7 @@ struct tsdb_tools_t
      * @brief 创建目录  
      * @param[in] const char * path  待创建目录路径  
      * @return BOOL 是否成功  
+     * @warning Windows 下最长的目录名是 186 字符; Linux 下最长的目录名是 255 字符。  
      */
     BOOL ( * make_dir )( const char * dir );
 
@@ -1225,6 +1565,9 @@ struct tsdb_tools_t
     time_t ( * parser_read_datetime_rfc867 )(
         parser2_t *      parser
     );
+    time_t ( * parser2_read_datetime_rfc867_gmt )(
+        parser2_t *      parser
+    );
 
     const tsdb_str * ( * get_sentence_sep_list2 )(
         int             charset,
@@ -1242,7 +1585,7 @@ struct tsdb_tools_t
      * @param[in] const char * line      A CSV line data
      * @param[in] int line_len           data len, not including '\0'
      * @param[in] const char * sep       separator of column
-     * @param[out] const_str * data      result data array, if this parameter is NULL, then data_count return real field_count
+     * @param[out] tsdb_str * data       result data array, if this parameter is NULL, then data_count return real field_count
      * @param[out] BOOL * data_is_string 
      * @param[in/out] int * data_count   input max of data count, return real data count
      * @param[return] int error code. 
@@ -1255,6 +1598,60 @@ struct tsdb_tools_t
         BOOL *          data_is_string,
         int *           data_count
     );
+
+    //<private>
+    /**
+     * @brief copy file with single thread
+     * @param src source file path
+     * @param dst destination file path, dst can not same with src
+     * @return int error code, 0 indicate OK, otherwise indicate copy error.
+     */
+    //</private>
+    int  ( * copy_file )( const char * src, const char * dst );
+
+    //<private>
+    /**
+     * @brief copy file with multi thread
+     * @param src source file path
+     * @param dst destination file path, dst can not same with src
+     * @param thread_count copy thread.
+     *                     1: same with copy_file
+     *                     0: use MAX CPU core count to copy file.
+     *                     other: use specific thread count to copy file
+     * @return int error code, 0 indicate OK, otherwise indicate copy error.
+     */
+    //</private>
+    int  ( * copy_file_fast )( const char * src, const char * dst, unsigned int thread_count );
+
+    //<private>
+    /**
+     * @brief check whether two files path are same.
+     * @param path1 first file path
+     * @param path2 second file path
+     * @return BOOL return TRUE if two file path are same, return FALSE otherwise.
+     */
+    //</private>
+    BOOL ( * is_same_path )( const char * path1, const char * path2 );
+
+    //<private>
+    /**
+     * @brief check path type
+     * @param[in] const char * path path string
+     * @param[in] unsigned int * sep_count
+     * @return int, value of CHECK_PATH_*
+     */
+    //</private>
+    int ( * check_path )( const char * path, unsigned int * sep_count );
+
+    //<private>
+    /**
+     * @brief read from console
+     * @param[out] tsdb_str * str  It's content readed from user input, caller NEED NOT manager the str's memory.
+                                   It valid before next time call this function.
+     * @return int error code
+     */
+    //</private>
+    int ( * read_console )( tsdb_str * str );
 
 };
 

@@ -14,9 +14,23 @@ namespace wide
 
 #define TSDB_COLUMN_TIME_NAME                   "time"
 
-    // 默认CSV文件分割符号  
+static const char* s_null_string = "null";
+
+// 默认CSV文件分割符号  
 #define DEFAULT_CSV_FILE_SEP "\t"
-     
+
+// 定义 配置数据文件map value 结构  
+//      有两部分组成 1.数据文件列表 2.分隔符号  允许为空  
+typedef std::vector<std::string> CONFIG_DATA_PATHS_T;
+typedef std::pair<CONFIG_DATA_PATHS_T, std::string> CONFIG_DATA_PATHS_SEP_T;
+
+// 定义默认buffer大小  
+static const int  DEFAULT_BUFFER_BYTES = 8192;
+
+// 无效但是可以被忽略  
+#define EINVALMAYEIGNORE         201
+
+
 // 字段增加变量结构体  
 struct field_increase_store_t {
 
@@ -153,6 +167,9 @@ struct dir_source_param_t {
 
     // 目录路径列表  
     std::vector<std::string> vt_dirs;
+
+    // 分隔符号  
+    std::string sep;
 };
 
 // 表名前缀和表名结构体  
@@ -569,26 +586,26 @@ int convert_table_conf_map_to_table_vector_ex(
 /**
  * @brief  解析表数据文件  
  * @param[in]  const char* table_data_conf_file                                           表数据配置文件路径  
- * @param[out] std::map < std::string,  std::vector<std::string> > & map_vt_table_head_data_path 表数据信息数组  
+ * @param[out] std::map <std::string,  CONFIG_DATA_PATHS_SEP_T> & map_vt_table_head_data_path 表数据信息数组  
  *             key : 表名前缀  
  *             value : 数据文件列表  
  * @return  0 成功 其他 失败  
  */
 int parse_table_data_conf_file(
     const char* table_data_conf_file,
-    std::map < std::string,  std::vector<std::string> > & map_vt_table_head_data_path);
+    std::map <std::string, CONFIG_DATA_PATHS_SEP_T> & map_vt_table_head_data_path);
 
 
 /**
  * @brief  将表数据信息转化vector格式 目的是为了便于将表数据发送到各个线程中  
- * @param[in] std::map < std::string,  std::vector<std::string> > & map_vt_table_head_data_path 表数据信息数组  
+ * @param[in] std::map < std::string,  CONFIG_DATA_PATHS_SEP_T > & map_vt_table_head_data_path 表数据信息数组  
  *             key : 表名前缀  
  *             value : 数据文件列表  
  * @param[out]  std::vector<struct table_lead_and_table_path_t> &vt_table_lead_and_table_name_t  表名信息vector形式  
  * @return  0 成功 其他 失败  
  */
 int convert_table_data_map_to_table_vector(
-    const std::map < std::string,  std::vector<std::string> > & map_vt_table_head_data_path,
+    const std::map < std::string,  CONFIG_DATA_PATHS_SEP_T > & map_vt_table_head_data_path,
     std::vector<struct table_lead_and_table_path_t> &vt_table_lead_and_table_path_t);
 
 
@@ -598,13 +615,15 @@ int convert_table_data_map_to_table_vector(
  * @param[in]   const char* sep                         csv 分隔符号  
  * @param[out]  std::vector<tsdb_str>& vt_data,         格式好的数据  
  * @param[out]  std::vector<BOOL>& vt_data_is_string    指示是否是字符串类型  
+ * @param[out]  int *line_no                            行号  
  * @return  0 成功 ENODATA 表示已经读到文件尾部了 其他情况失败  
  */
 int get_format_line_from_csv_file(
     file_operation& fo,
     const char* sep,
     std::vector<tsdb_str>& vt_data,
-    std::vector<BOOL>& vt_data_is_string);
+    std::vector<BOOL>& vt_data_is_string,
+    int *line_no);
 
 /**
  * @brief  为int初始化数据  
@@ -749,6 +768,25 @@ bool is_digit_all(const std::string& str);
  * @return   0 成功 其他 错误  
  */
 int deal_with_for_boolean(std::string& value, tsdb_str& ts, enum tsdb_datatype_t datatype);
+
+
+/**
+ * @brief  整理分隔符号 目前支持 "\t" " " "\n" "\r" "\'" "\"" "," 符号  
+ * @param[in]  const char *sep            从命令行获取到的分隔符号  
+ * @param[out] std::string &sep_after     返回处理后的分隔符号  
+ * @return   0 成功 其他 错误  
+ */
+int tidy_separate_symbol(const char *sep, std::string &sep_after);
+
+/**
+ * @brief  去除头尾字符仅仅是清理一次  
+ * @param[in]  const std::string &source  原始字符串  
+ * @param[in]  const char sep             分隔符号  
+ * @param[out] std::string &target        返回处理后的字符串  
+ * @return   0 成功 其他 错误  
+ */
+int trim_first_and_last_char_only_once(const std::string& source, const char sep, std::string& target);
+
 } // namespace wide
 
 } // namespace rtdb

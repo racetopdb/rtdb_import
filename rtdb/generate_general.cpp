@@ -77,6 +77,9 @@ struct thread_param_generate_general_t
     // 当前创建了多少条数据了  
     int current_count;
 
+    // 字段间的分隔符号  
+    std::string sep;
+
     // padding memory, nothing.
     char                        padding[64];
 };
@@ -156,7 +159,7 @@ void* generate_data_general_thread(void* _param)
                     return NULL;
                 }
                 // 忽略 i=0 时间主键 插入字段名字  
-                generate_field_for_one_line(vt_test_tb_field_info_t, 1,"\t", s);
+                generate_field_for_one_line(vt_test_tb_field_info_t, 1, param->sep.c_str(), s);
                 s += '\n';
 
                 int len = fo.write_one_line(s.c_str(), (unsigned int)s.length(), true);
@@ -172,7 +175,7 @@ void* generate_data_general_thread(void* _param)
             s.resize(0);
             // 忽略 i=0 时间主键 插入数据  
             param->r = generate_data_for_one_line(gtdri.vt_field_increase_store_t,
-                vt_test_tb_field_info_t, 1, "\t", s);
+                vt_test_tb_field_info_t, 1, param->sep.c_str(), s);
             if (0 != param->r) {
                 param->r = EFAULT;
                 TSDB_ERROR(p, "[GENERATE][path:%s][line:%s] generate_data_for_one_line failed", file_path.c_str(), s.c_str());
@@ -368,8 +371,21 @@ int generate_data_general( int argc, char ** argv )
         vt_generate_table_data_runtime_info_t[i].vt_field_increase_store_t.resize(0);
     }
 
+    // Database name, this will be write into destination file.
+    const char* sep = NULL;
+    p->tools->find_argv(argc, argv, "sep", &sep, NULL);
+    if (NULL == sep || '\0' == *sep) {
+        sep = DEFAULT_CSV_FILE_SEP;
+    }
+    
+    std::string sep_after;
 
-    // prepare CREATE TABLE threads
+    // 分隔符号比较特殊 需要整理下  
+    tidy_separate_symbol(sep, sep_after);
+
+    TSDB_INFO(p, "[GENERATE][PARAMETERS][sep_after          =%s]", sep_after.c_str());
+
+    // prepare CREATE threads 
 
     std::vector< thread_param_generate_general_t >   threads;
     threads.resize(thread_count);
@@ -393,6 +409,7 @@ int generate_data_general( int argc, char ** argv )
         item.vt_test_table_file_info_t = &vt_test_table_file_info_t;
         item.vt_generate_table_data_runtime_info_t = &vt_generate_table_data_runtime_info_t;
         item.current_count = 0;
+        item.sep = sep_after;
     }
 
     for (size_t i = 0; i < threads.size(); ++i) {

@@ -1,5 +1,6 @@
-#include "main.h"
 #include <sstream>
+#include "main.h"
+
 
 using namespace rtdb::wide;
 
@@ -28,7 +29,7 @@ static void usage( int argc, char ** argv )
     ss << S_CRLF S_CRLF;
 
     ss << "generate import data:" S_CRLF S_CRLF;
-    ss << "\t" << ph << " -generate.data.general  -thread 2 -path ./general_table.conf -format txt  -start_time 2020-01-01 -step_time 1000 -stop_time 2020-02-01 -line_count 100"   << S_CRLF;
+    ss << "\t" << ph << " -generate.data.general  -thread 2 -path ./general_table.conf -format txt  -start_time 2020-01-01 -step_time 1000 -stop_time 2020-02-01 -line_count 100 -sep \"\\t\" "   << S_CRLF;
     ss << "\t\tthread:       how many threads used to create data, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\tpath:         file path generate by 'general_table.conf' file." << S_CRLF;
     ss << "\t\tformat:       only support 'txt', default value is 'txt'" << S_CRLF;
@@ -45,6 +46,7 @@ static void usage( int argc, char ** argv )
     ss << "\t\tline_count:   need create lines one tables. " S_CRLF;
     ss << "\t\t              line_count and stop_time cannot be 0 at the same time.." S_CRLF;
     ss << "\t\t              line_count priority is greater than stop_time ." S_CRLF;
+    ss << "\t\tsep      :    separate symbol. like \"\\t\",\" \",\"\\n\",\"\\r\",\"\\'\",\"\\\"\",\",\" " S_CRLF;
     ss << S_CRLF;
 
     ss << "create table:" S_CRLF S_CRLF;
@@ -61,6 +63,10 @@ static void usage( int argc, char ** argv )
 #if ENABLE_INFLUXDB
     ss << "\t" << ph << " -create.table.general -engine influxdb -server 192.168.1.43:8086 -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE" << S_CRLF;
 #endif // #if ENABLE_INFLUXDB
+#if ENABLE_CLICKHOUSE
+    ss << "\t" << ph << " -create.table.general -engine clickhouse -server 192.168.110.64:9000:[user:password] -thread 3 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite -path ./general_table.conf -format txt  -db DB_TEST_WRITE" << S_CRLF;
+#endif // #if ENABLE_CLICKHOUSE
+    
     ss << "\t\tengine:       rtdb      RTDB (http://www.rtdb.com)." << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t\t              taos      TAOS (http://www.taosdata.com)." << S_CRLF;
@@ -74,6 +80,10 @@ static void usage( int argc, char ** argv )
 #if ENABLE_INFLUXDB
     ss << "\t\t              influxdb      INFLUXDB (https://www.influxdata.com)." << S_CRLF;
 #endif // #if ENABLE_INFLUXDB
+#if ENABLE_CLICKHOUSE
+    ss << "\t\t              clickhouse    CLICKHOUSE (http://www.clickhouse.com/)." << S_CRLF;
+#endif // #if ENABLE_CLICKHOUSE
+
     ss << "\t\tserver:       server address, format is 'ip:port'." << S_CRLF;
     ss << "\t\tthread:       how many threads used to create table, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\ttimeout.conn: socket connect timeout by ms. '3000' by default." S_CRLF;
@@ -85,19 +95,23 @@ static void usage( int argc, char ** argv )
     ss << S_CRLF;
 
     ss << "insert into table:" S_CRLF S_CRLF;
-    ss << "\t" << ph << " -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m  -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf"        << S_CRLF;
+    ss << "\t" << ph << " -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m  -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf -sep \"\\t\""        << S_CRLF;
 #if ENABLE_TDENGINE
-    ss << "\t" << ph << " -insert.table.general -engine taos -server 192.168.1.43:6030 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf"        << S_CRLF;
+    ss << "\t" << ph << " -insert.table.general -engine taos -server 192.168.1.43:6030 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf -sep \"\\t\""        << S_CRLF;
 #endif // #if ENABLE_TDENGINE
 #if ENABLE_TIMESCALEDB
-    ss << "\t" << ph << " -insert.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf" << S_CRLF;
+    ss << "\t" << ph << " -insert.table.general -engine timescaledb -server 192.168.1.43:5432 -thread 80 -timeout.conn infinite -timeout.send infinite -timeout.recv infinite  -start_time '2020-01-01' -step_time 1000 -stop_time 1m -sql_size 128k -db DB_TEST_WRITE -table_conf ./general_table.conf -sep \"\\t\"" << S_CRLF;
 #endif // #if ENABLE_TIMESCALEDB
 #if ENABLE_OPENTSDB
-    ss << "\t" << ph << " -find.table.general -engine opentsdb -server 192.168.1.43:4242 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+    ss << "\t" << ph << " -insert.table.general -engine opentsdb -server 192.168.1.43:4242 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt -sep \"\\t\"" << S_CRLF;
 #endif // #if ENABLE_OPENTSDB
 #if ENABLE_INFLUXDB
-    ss << "\t" << ph << " -find.table.general -engine influxdb -server 192.168.1.43:8086 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+    ss << "\t" << ph << " -insert.table.general -engine influxdb -server 192.168.1.43:8086 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt -sep \"\\t\"" << S_CRLF;
 #endif // #if ENABLE_INFLUXDB
+#if ENABLE_CLICKHOUSE
+    ss << "\t" << ph << " -insert.table.general -engine clickhouse -server 192.168.110.64:9000:[user:password] -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt -sep \"\\t\"" << S_CRLF;
+#endif // #if ENABLE_CLICKHOUSE
+
     ss << "\t\tengine:       rtdb      RTDB (http://www.rtdb.com)." << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t\t              taos      TAOS (http://www.taosdata.com)." << S_CRLF;
@@ -111,6 +125,9 @@ static void usage( int argc, char ** argv )
 #if ENABLE_INFLUXDB
     ss << "\t\t              influxdb      INFLUXDB (https://www.influxdata.com)." << S_CRLF;
 #endif // #if ENABLE_INFLUXDB
+#if ENABLE_CLICKHOUSE
+    ss << "\t\t              clickhouse    CLICKHOUSE (http://www.clickhouse.com/)." << S_CRLF;
+#endif // #if ENABLE_CLICKHOUSE
     ss << "\t\tserver:       server address, format is 'ip:port'." << S_CRLF;
     ss << "\t\tthread:       how many threads used to write data, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\ttimeout.conn: socket connect timeout by ms. '3000' by default." S_CRLF;
@@ -132,11 +149,12 @@ static void usage( int argc, char ** argv )
     ss << "\t\tformat:       only support 'txt', default value is 'txt'" << S_CRLF;
     ss << "\t\tdb:           which database will be createdd. default value is 'DB_TEST_WRITE'" << S_CRLF;
     ss << "\t\ttable_conf:   file path generate by 'general_table.conf' file." << S_CRLF;
+    ss << "\t\tsep      :    separate symbol. like \"\\t\",\" \",\"\\n\",\"\\r\",\"\\'\",\"\\\"\",\",\" " S_CRLF;
     ss << S_CRLF;
 
 
     ss << "find from table:" S_CRLF S_CRLF;
-    ss << "\t" << ph << " -insert.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt"        << S_CRLF;
+    ss << "\t" << ph << " -find.table.general -engine rtdb -server 127.0.0.1:9000 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt"        << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t" << ph << " -find.table.general -engine taos -server 127.0.0.1:6030 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt"        << S_CRLF;
 #endif // #if ENABLE_TDENGINE
@@ -149,6 +167,10 @@ static void usage( int argc, char ** argv )
 #if ENABLE_INFLUXDB
     ss << "\t" << ph << " -find.table.general -engine influxdb -server 127.0.0.1:8086 -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
 #endif // #if ENABLE_INFLUXDB
+#if ENABLE_CLICKHOUSE
+    ss << "\t" << ph << " -find.table.general -engine clickhouse -server 192.168.110.64:9000:[user:password] -thread 80 -timeout.recv infinite -start_time '2020-01-01' -step_time 1000 -stop_time 1m -stop_line 1000 -db DB_TEST_WRITE -path ./general_table.conf -format txt" << S_CRLF;
+#endif // #if ENABLE_CLICKHOUSE
+
     ss << "\t\tengine:       rtdb      RTDB (http://www.rtdb.com)." << S_CRLF;
 #if ENABLE_TDENGINE
     ss << "\t\t              taos      TAOS (http://www.taosdata.com)." << S_CRLF;
@@ -162,6 +184,9 @@ static void usage( int argc, char ** argv )
 #if ENABLE_INFLUXDB
     ss << "\t\t              influxdb      INFLUXDB (https://www.influxdata.com)." << S_CRLF;
 #endif // #if ENABLE_INFLUXDB
+#if ENABLE_CLICKHOUSE
+    ss << "\t\t              clickhouse    CLICKHOUSE (http://www.clickhouse.com/)." << S_CRLF;
+#endif // #if ENABLE_CLICKHOUSE
     ss << "\t\tserver:       server address, format is 'ip:port'." << S_CRLF;
     ss << "\t\tthread:       how many threads used to find data, default thread count same with CPU core count" << S_CRLF;
     ss << "\t\ttimeout.recv: socket connect timeout by ms. '3000' by default." S_CRLF;
@@ -191,18 +216,20 @@ static void usage( int argc, char ** argv )
     ss << "\t\t # table_tail_list : List of table name suffixes " S_CRLF;
     ss << "\t\t # file_path : Tabular path " S_CRLF;
     ss << "\t\t # Note: The list at the end of the table is separated by commas between each table [1, 3]. This format can be used, but the premise must be that the data and the right side is greater than the left side " S_CRLF;
-    ss << "\t\t process_\t\tA, B\t./general_process.txt " S_CRLF;
-    ss << "\t\t location_\t\tA, D, E, F\t./general_location.txt " S_CRLF;
-    ss << "\t\t TABLE_\t\t[1, 5]\t./general_std.txt " S_CRLF;
+    ss << "\t\t process_ \\t \\t A, B \\t ./general_process.txt " S_CRLF;
+    ss << "\t\t location_ \\t \\t A, D, E, F \\t ./general_location.txt " S_CRLF;
+    ss << "\t\t TABLE_ \\t \\t [1, 5] \\t ./general_std.txt " S_CRLF;
     ss << S_CRLF;
         
     ss << "example: general_data.conf:" S_CRLF S_CRLF;
     ss << "\t\t # table_lead     : prefix the table name " S_CRLF;
     ss << "\t\t # data_path_list : List of data file paths " S_CRLF;
+    ss << "\t\t # sep            : [Optional] The separator can be multiple. Currently, two separators, comma and tab, are supported. " S_CRLF;
+    ss << "\t\t                    For example, '\\t,' If there is no separator, the default is the separator passed in the command line. " S_CRLF;
     ss << "\t\t # notion         : Use commas to separate the list of data file paths " S_CRLF; 
-    ss << "\t\t process_\t./process-modify.csv " S_CRLF;
-    ss << "\t\t location_\t./location - modify.csv " S_CRLF;
-    ss << "\t\t TABLE_\t./general_std.txt.data " S_CRLF;
+    ss << "\t\t process_ \\t ./process-modify.csv \\t \'\\t,\'" S_CRLF;
+    ss << "\t\t location_ \\t ./location - modify.csv \\t \'\\t,\'" S_CRLF;
+    ss << "\t\t TABLE_ \\t ./general_std.txt.data \\t \'\\t,\'" S_CRLF;
     ss << S_CRLF;
 
 
@@ -214,9 +241,9 @@ static void usage( int argc, char ** argv )
 
 
     ss << "example: general_std.txt.data: " S_CRLF S_CRLF;
-    ss << "\t\t FIELD_0\tFIELD_1\tFIELD_2\tFIELD_3\tFIELD_4\tFIELD_5\tFIELD_6 " S_CRLF;
-    ss << "\t\t false\t0\t0\t0.23\t0.23\t'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx32'\t'2020-01-01 00:00:00.000' " S_CRLF;
-    ss << "\t\t false\t1000\t1000\t1.23\t1.23\t'1000xxxxxxxxxxxxxxxxxxxxxxxxxx32'\t'2020-01-01 00:00:01.000' " S_CRLF;
+    ss << "\t\t FIELD_0 \\t FIELD_1 \\t FIELD_2 \\t FIELD_3 \\t FIELD_4 \\t FIELD_5                          \\t FIELD_6 " S_CRLF;
+    ss << "\t\t false   \\t 0       \\t 0       \\t 0.23    \\t 0.23    \\t'0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx32'\\t'2020-01-01 00:00:00.000' " S_CRLF;
+    ss << "\t\t false   \\t 1000    \\t 1000    \\t 1.23    \\t 1.23    \\t'1000xxxxxxxxxxxxxxxxxxxxxxxxxx32'\\t'2020-01-01 00:00:01.000' " S_CRLF;
     ss << S_CRLF;
      
 

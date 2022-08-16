@@ -74,7 +74,7 @@ struct thread_param_insert_table_v2_t
     std::map<std::string, struct test_table_file_info_t>* map_test_table_file_info_t;
 
     // 表名前缀和表数据映射关系  
-    std::map < std::string, std::vector<std::string> > *map_vt_table_head_data_path;
+    std::map < std::string, CONFIG_DATA_PATHS_SEP_T > *map_vt_table_head_data_path;
 
     // 表名前缀和表数据对应关系 vector 形式  
     std::vector<struct table_lead_and_table_path_t> *vt_table_lead_and_table_path_t;
@@ -189,9 +189,10 @@ void * insert_table_thread_v2( void * _param )
             std::vector<BOOL> vt_data_is_string;
             int data_count = 0;
             const char* sep = DEFAULT_CSV_FILE_SEP;
+            
 
             //从csv文件中获取一行并格式化  
-            param->r = get_format_line_from_csv_file(fo, sep, vt_data, vt_data_is_string);
+            param->r = get_format_line_from_csv_file(fo, sep, vt_data, vt_data_is_string, NULL);
             if (0 != param->r) {
                 if (ENODATA == param->r) {
                     fo.close();
@@ -779,7 +780,7 @@ int insert_table_v2( int argc, char ** argv )
     }
 
 
-    std::map < std::string, std::vector<std::string> > map_vt_table_head_data_path;
+    std::map < std::string, CONFIG_DATA_PATHS_SEP_T > map_vt_table_head_data_path;
     // 解析表数据文件  
     r = parse_table_data_conf_file(path.c_str(), map_vt_table_head_data_path);
     if (0 != r) {

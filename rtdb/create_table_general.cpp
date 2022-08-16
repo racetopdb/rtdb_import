@@ -1,8 +1,9 @@
+#include <sstream>
 #include "wide_base.h"
 #include "utils.h"
 #include <assert.h>
 #include <string>
-#include <sstream>
+
 
 //此文件是基于create_table.cpp 修改的 数据库名字是基于外部参数传递进来的, 内部文件中的数据库则直接忽略了 -db DB_TEST_WRITE  
 
@@ -285,9 +286,113 @@ static int build_create_table_sql_for_influxdb(
     return r;
 }
 
+// 创建表的sql语句目前仅处理clickhouse  
+static int build_create_table_sql_for_clickhouse(
+    const std::string& table_name,
+    const std::vector<struct test_tb_field_info_t>& vt_test_tb_field_info_t,
+    std::string& sql)
+{
+    int r = 0;
+
+    tsdb_v3_t* p = rtdb_tls();
+    assert(p);
+
+    sql.resize(0);
+
+    std::stringstream ss;
+    ss << "create table ";
+    ss << " if not exists ";
+    ss << table_name;
+    ss << " (";
+
+    //NOTE: 目前服务器端如果加入主键会报错 此处 先忽略   
+    for (size_t i = 0; i < vt_test_tb_field_info_t.size(); i++)
+    {
+        if (0 != i) {
+            ss << ",";
+            ss << " ";
+        }
+       
+        
+        const enum tsdb_datatype_t datatype = vt_test_tb_field_info_t[i].datatype;
+        bool is_null = vt_test_tb_field_info_t[i].is_null;
+        
+        switch (datatype)
+        {
+        case TSDB_DATATYPE_BOOL:
+        case TSDB_DATATYPE_INT:
+        case TSDB_DATATYPE_INT64:
+        case TSDB_DATATYPE_FLOAT:
+        case TSDB_DATATYPE_DOUBLE:
+        {
+            ss << vt_test_tb_field_info_t[i].name;
+            ss << " ";
+            if (likely(is_null)) {
+                ss << "Nullable";
+                ss << "(";
+                ss << vt_test_tb_field_info_t[i].type;
+                ss << ")";
+            }
+            else {
+                ss << vt_test_tb_field_info_t[i].type;
+            }
+            break;
+        }
+        case TSDB_DATATYPE_STRING:
+        {
+            ss << vt_test_tb_field_info_t[i].name;
+            ss << " ";
+            if (likely(is_null)) {
+                ss << "Nullable";
+                ss << "(";
+                ss << "String";
+                ss << ")";
+            }
+            else {
+                ss << "String";
+            }
+            break;
+        }
+            
+        case TSDB_DATATYPE_DATETIME_MS:
+        {
+            ss << vt_test_tb_field_info_t[i].name;
+            ss << " ";
+            if (likely(is_null)) {
+                ss << "Nullable";
+                ss << "(";
+                ss << "DateTime64(3)";  // 保持到毫秒即可  
+                ss << ")";
+            }
+            else {
+                ss << "DateTime64(3)";  // 保持到毫秒即可  
+            }
+            break;
+        }
+        
+        
+        case TSDB_DATATYPE_UNKNOWN:
+        case TSDB_DATATYPE_POINTER:
+        case TSDB_DATATYPE_BINARY:
+        case TSDB_DATATYPE_TAG_STRING:
+        default:
+            TSDB_ERROR(p, "[r=%d][datatyp:%d] invalid datatyp", (int)datatype);
+            return EINVAL;
+        }
+    }
+
+    ss << ")";
+    ss << "ENGINE=StripeLog";  // 使用默认表引擎  
+    ss << ";";
+
+    sql = ss.str();
+
+    return r;
+}
 
 
-// 创建表的sql语句目前仅处理rtdb taos  
+
+// 创建表的sql语句  
 static int build_create_table_sql(
     db_type_t engine,
     const std::string& table_name,
@@ -320,6 +425,10 @@ static int build_create_table_sql(
     case rtdb::wide::DB_INFLUXDB:
     {
         return build_create_table_sql_for_influxdb(table_name, vt_test_tb_field_info_t, sql);
+    }
+    case rtdb::wide::DB_CLICKHOUSE:
+    {
+        return build_create_table_sql_for_clickhouse(table_name, vt_test_tb_field_info_t, sql);
     }
     case rtdb::wide::DB_UNKNOWN:
     default:
@@ -357,7 +466,7 @@ void * create_table_general_thread( void * _param )
     
 
     std::string sql;
-    sql.reserve(8192);
+    sql.reserve(DEFAULT_BUFFER_BYTES);
     sql.resize(0);
 
     // USE DB
@@ -388,7 +497,7 @@ void * create_table_general_thread( void * _param )
 
         std::vector<struct test_tb_field_info_t> & vt_test_tb_field_info_t = iter->second.vt_test_tb_field_info_t;
 
-        // 构建sql 语句 目前仅仅支持  rtdb, taos, timescale, opentsdb(这个啥也不做)   
+        // 构建sql 语句 目前仅仅支持  rtdb, taos, timescale, opentsdb(这个啥也不做), clickhouse   
         param->r = build_create_table_sql(param->engine, tlatn.table_name, vt_test_tb_field_info_t, sql);
         if (unlikely(0 != param->r)) {
             TSDB_ERROR(p, "[CREATE][thread_id=%d][table_name:%s][r=%d] build_create_table_sql failed",

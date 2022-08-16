@@ -243,13 +243,13 @@
 // nullptr
 //
 //</private>
-#ifdef __cplusplus
+/*#ifdef __cplusplus
     #if __cplusplus <= 199711L
         #ifndef nullptr
             #define nullptr     NULL
         #endif
     #endif
-#endif
+#endif*/
 
 //<private>
 ///////////////////////////////////////////////////////////////////////
@@ -482,6 +482,45 @@ static inline int isspace2( char c )
     #define	false       0
 #endif
 
+
+//<private>
+// abs64
+// abs
+// BOOL
+//</private>
+#if defined( _WIN32 ) || defined( _WIN64 )
+
+    #define abs64(x)        _abs64((x))
+
+    #if ! defined( BOOL_DEFINED )
+        #define BOOL_DEFINED    1
+    #endif // #if ! defined( BOOL_DEFINED )
+
+#else
+    //<non_windows>
+
+    #define abs64(x)        llabs((x))
+
+    #if ! defined( BOOL_DEFINED )
+        #define BOOL_DEFINED    1
+        typedef int BOOL;
+    #endif // #if ! defined( BOOL_DEFINED )
+    #ifndef FALSE
+        #define FALSE               0
+    #endif
+    #ifndef TRUE
+        #define TRUE                1
+    #endif
+
+#endif
+//<private>
+//2022-05-22 fixed abs bug for long long parameter
+//2022-07-26 remove #define abs(x) abs64((x)), because this not compatible with clickhouse
+//</private>
+//#define     abs(x)          abs64((x))
+
+
+
 static inline int dpr_timezone()
 {
     static int    g_dpr_datetime_timezone          = 0;
@@ -543,14 +582,14 @@ static inline void dpr_adjust_timezone( time_t * p, bool is_from_local )
         if ( tz > 0 ) {
             * p -= ( (time_t)tz * 60 * 60 );
         } else if ( tz < 0 ) {
-            * p += ( (time_t)abs( tz ) * 60 * 60 );
+            * p += ( (time_t)abs64( tz ) * 60 * 60 );
         }
     } else {
         // gmt -> local
         if ( tz > 0 ) {
             * p += ( (time_t)tz * 60 * 60 );
         } else if ( tz < 0 ) {
-            * p -= ( (time_t)abs( tz ) * 60 * 60 );
+            * p -= ( (time_t)abs64( tz ) * 60 * 60 );
         }
     }
 }
@@ -560,7 +599,7 @@ static inline void dpr_adjust_timezone( time_t * p, bool is_from_local )
 //</private>
 static const char datetime_mon_days[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
-static inline struct tm * dpr_localtime_r(const time_t *srctime,struct tm *tm_time)
+static inline struct tm * dpr_time_2_tm( const time_t *srctime, struct tm *tm_time, BOOL is_local )
 {
     long int n32_Pass4year,n32_hpery;
 
@@ -572,8 +611,18 @@ static inline struct tm * dpr_localtime_r(const time_t *srctime,struct tm *tm_ti
     //<private>
     //计算时差  
     //</private>
-    time_t time         = * srctime;
-    dpr_adjust_timezone( & time, false );
+    time_t time;
+    if ( unlikely( NULL == srctime || * srctime < 0 ) ) {
+        if ( tm_time ) {
+            memset( tm_time, 0, sizeof(struct tm) );
+        }
+        return NULL;
+    }
+
+    time            = * srctime;
+    if ( is_local ) {
+        dpr_adjust_timezone( & time, false );
+    }
     tm_time->tm_isdst   = 0;
     if( time < 0 ) {
         time = 0;
@@ -687,6 +736,16 @@ static inline struct tm * dpr_localtime_r(const time_t *srctime,struct tm *tm_ti
     return tm_time;
 }
 
+static inline struct tm * dpr_localtime_r( const time_t * srctime, struct tm * tm_time )
+{
+    return dpr_time_2_tm( srctime, tm_time, TRUE );
+}
+
+static inline struct tm * dpr_gmttime_r( const time_t * srctime, struct tm * tm_time )
+{
+    return dpr_time_2_tm( srctime, tm_time, FALSE );
+}
+
 static inline time_t mktime2_inner(
     unsigned int  year,
     unsigned int  mon,
@@ -722,7 +781,7 @@ static inline time_t mktime2_inner(
     ) * 60 + sec;       // seconds
 }
 
-static inline time_t mktime2( const struct tm* ltm )
+static inline time_t mktime2( const struct tm * ltm, BOOL tm_is_local )
 {
     time_t r = mktime2_inner( ltm->tm_year + 1900,
                               ltm->tm_mon + 1,
@@ -731,23 +790,36 @@ static inline time_t mktime2( const struct tm* ltm )
                               ltm->tm_min,
                               ltm->tm_sec );
     if ( r > 0 ) {
-        dpr_adjust_timezone( & r, true );
-        if ( unlikely( r <= 0 ) ) {
-            r = 0;
+        if ( tm_is_local ) {
+            dpr_adjust_timezone( & r, true );
+            if ( unlikely( r <= 0 ) ) {
+                r = 0;
+            }
         }
     }
     return r;
 }
 
+static inline time_t mktime_from_local( const struct tm * ltm )
+{
+    return mktime2( ltm, TRUE );
+}
+
+static inline time_t mktime_from_gmt( const struct tm * ltm )
+{
+    return mktime2( ltm, FALSE );
+}
+
 #ifdef mktime
     #undef mktime
 #endif
-#define mktime  mktime2
+#define mktime  mktime_from_local
 
 //<private>
 // ftello
 // fseeko
 // atoi64
+// abs64
 // atoll
 // stricmp
 // strnicmp
@@ -760,6 +832,7 @@ static inline time_t mktime2( const struct tm* ltm )
     #define fseeko          _fseeki64
     #define atoi64(x)       _atoi64((x))
     #define atoll(x)        _atoi64((x))
+    #define abs64(x)        _abs64((x))
     #ifndef stricmp
         #define stricmp     _stricmp
     #endif
@@ -772,16 +845,18 @@ static inline time_t mktime2( const struct tm* ltm )
     #define lstrnicmp       _strnicmp
     #define S_CRLF          "\r\n"
     #define localtime_r( NOW, RET )     ((0 == localtime_s( (RET), (NOW) )) ? (RET) : NULL)
+    #define gmttime_r( NOW, RET )       ((0 == gmttime_s( (RET), (NOW) )) ? (RET) : NULL)
 
 #else
     //<non_windows>
 
     #define atoi64(x)       atoll((x))
+    #define abs64(x)        llabs((x))
     #ifndef stricmp
         #define stricmp     strcasecmp
     #endif
     #define strnicmp        strncasecmp
-    #define MAX_PATH        260
+    #define MAX_PATH        4096
     #define S_CRLF          "\n"
 
     static inline char * strupr( char * string )
@@ -798,6 +873,7 @@ static inline time_t mktime2( const struct tm* ltm )
 
     //#if defined( __linux )
         #define localtime_r     dpr_localtime_r
+        #define gmttime_r       dpr_gmttime_r
     //#endif // #if defined( __linux )
 
     //</non_windows>
@@ -937,10 +1013,6 @@ extern "C" {
 //</private>
 #if defined( _WIN32 ) || defined( _WIN64 )
 
-    #if ! defined( BOOL_DEFINED )
-        #define BOOL_DEFINED    1
-    #endif // #if ! defined( BOOL_DEFINED )
-
     typedef int                 pid_t;
 
     static inline char * getcwd( char * buf, int buf_len )
@@ -1005,17 +1077,6 @@ extern "C" {
 
 	typedef int	SOCKET;
 
-    #if ! defined( BOOL_DEFINED )
-        #define BOOL_DEFINED    1
-        typedef int BOOL;
-    #endif // #if ! defined( BOOL_DEFINED )
-
-    #ifndef FALSE
-        #define FALSE               0
-    #endif
-    #ifndef TRUE
-        #define TRUE                1
-    #endif
     #ifndef SOCKET_ERROR
         #define SOCKET_ERROR    (int)-1
     #endif

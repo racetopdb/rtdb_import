@@ -4,7 +4,9 @@
 #include "../wide_timescaledb.h"
 #include "OPENTSDB/wide_opentsdb.h"
 #include "INFLUXDB/wide_influxdb.h"
-
+#if defined (ENABLE_CLICKHOUSE) 
+#include "../wide_clickhouse.h"
+#endif
 namespace rtdb
 {
 
@@ -66,8 +68,14 @@ db_type_t get_db_type( int argc, char ** argv )
 #endif // #if ENABLE_INFLUXDB
         return DB_UNKNOWN;
     }
+    else if (0 == stricmp("clickhouse", engine)) {
+#if ENABLE_CLICKHOUSE
+        return DB_CLICKHOUSE;
+#endif // #if ENABLE_CLICKHOUSE
+        return DB_UNKNOWN;
+    }
     else {
-        TSDB_ERROR( p, "[engine=%s]invalid engine, only supported: rtdb | taos | timescaledb", engine );
+        TSDB_ERROR( p, "[engine=%s]invalid engine, only supported: rtdb | taos | timescaledb | opentsdb |influxdb |clickhouse", engine );
         return DB_UNKNOWN;
     }
 }
@@ -114,6 +122,14 @@ wide_base_t * wide_base_t::instance( db_type_t type, int argc, char ** argv )
                 o = new wide_influxdb_t();
 #else
                 TSDB_ERROR(p, "[type=%d]this system version not support for influxdb", (int)type);
+                o = NULL;
+#endif
+                break;
+            case DB_CLICKHOUSE:
+#if ENABLE_CLICKHOUSE
+                o = new wide_clickhouse_t();
+#else
+                TSDB_ERROR(p, "[type=%d]this system version not support for clickhouse", (int)type);
                 o = NULL;
 #endif
                 break;
